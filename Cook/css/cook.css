@@ -1,0 +1,481 @@
+/* Cook/css/cook.css */
+
+/* ===== Layout: 2/3 form + 1/3 offers list ===== */
+.cook-container {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 2rem;
+    align-items: start;
+}
+@media (max-width: 900px) {
+    .cook-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== Form styling ===== */
+#create-offer-form .form-group {
+    margin-bottom: 1.25rem;
+}
+#create-offer-form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.95rem;
+}
+#create-offer-form .form-control {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--text-color);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    box-sizing: border-box;
+}
+#create-offer-form .form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 25%, transparent);
+}
+#create-offer-form .form-control[readonly] {
+    background: #f1f5f9;
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+#create-offer-form textarea.form-control {
+    min-height: 100px;
+    resize: vertical;
+}
+#create-offer-form select.form-control {
+    cursor: pointer;
+}
+#create-offer-form input[type="file"].form-control {
+    padding: 0.5rem;
+}
+
+/* Allergens: 2-column grid */
+#allergens-container,
+#edit-allergens-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.5rem;
+}
+#allergens-container label,
+#edit-allergens-container label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    font-weight: 400;
+    cursor: pointer;
+    padding: 0.4rem 0.6rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius);
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+#allergens-container label:hover,
+#edit-allergens-container label:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+#allergens-container input[type="checkbox"],
+#edit-allergens-container input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--primary-color);
+    flex-shrink: 0;
+}
+
+/* Form submit button */
+#create-offer-form button[type="submit"],
+#edit-offer-form button[type="submit"] {
+    width: 100%;
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 0.5rem;
+}
+
+/* ===== Offer Cards: Horizontal layout with image on left ===== */
+/* The JS generates: .offer-card with direct img child, .offer-header, p, div for actions, requests section */
+.offer-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 1.25rem;
+    align-items: start;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.offer-card:hover {
+    box-shadow: 0 8px 24px -4px rgba(15, 23, 42, 0.1), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+    border-color: #cbd5e1;
+}
+@media (max-width: 640px) {
+    .offer-card {
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+}
+
+/* Image on left - first child of .offer-card */
+.offer-card > img:first-child {
+    width: 180px;
+    height: 140px;
+    object-fit: cover;
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid var(--border-color);
+    flex-shrink: 0;
+}
+@media (max-width: 640px) {
+    .offer-card > img:first-child {
+        width: 100%;
+        height: 180px;
+        max-height: 180px;
+    }
+}
+
+/* Header: title + badge - already has .offer-header class from JS */
+.offer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+.offer-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--secondary-color);
+    line-height: 1.3;
+}
+
+/* Badge: pill style - JS uses .badge.badge-{status} */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.35rem 0.875rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.badge-active { background-color: #dcfce7; color: #15803d; }
+.badge-inactive { background-color: #fef3c7; color: #b45309; }
+.badge-completed { background-color: #dbeafe; color: #1d4ed8; }
+.badge-cancelled { background-color: #fee2e2; color: #dc2626; }
+.badge-expired { background-color: #f3f4f6; color: #6b7280; }
+
+/* Description paragraph */
+.offer-card > p:not(.offer-allergens):not(.offer-meta) {
+    margin: 0.5rem 0;
+    color: var(--text-color);
+    line-height: 1.5;
+    font-size: 0.95rem;
+}
+
+/* Allergens line - JS creates p with "Αλλεργιογόνα:" */
+.offer-card p:has(strong:contains("Αλλεργιογόνα")),
+.offer-card p:has(strong:contains("Αλλεργιογόνα")) {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: 0.5rem 0;
+}
+
+/* Metadata paragraph - JS creates p with "Μερίδες | Σημείο | Παραλαβή" */
+.offer-card > p:has(strong) {
+    /* This will be overridden by more specific rule below */
+}
+
+/* Target the metadata paragraph specifically (contains 🥣 or 📍 or ⏰) */
+.offer-card > p:has(strong) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.75rem 0;
+    font-size: 0.8rem;
+    color: var(--text-color);
+    font-weight: 500;
+}
+.offer-card > p:has(strong) > strong {
+    color: var(--secondary-color);
+    font-weight: 600;
+}
+/* Convert pipe separators to chips via CSS - wrap each segment */
+.offer-card > p:has(strong) {
+    background: #f1f5f9;
+    border-radius: 9999px;
+    padding: 0.35rem 0.75rem;
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+/* Actions: Edit/Delete buttons - JS creates div with style="display: flex; gap: 0.5rem" */
+.offer-card > div[style*="display: flex"][style*="gap: 0.5rem"] {
+    display: flex !important;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+    flex-wrap: wrap;
+}
+.offer-card > div[style*="display: flex"][style*="gap: 0.5rem"] .btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+.offer-card > div[style*="display: flex"][style*="gap: 0.5rem"] .btn-outline {
+    border-color: #cbd5e1;
+    color: #475569;
+}
+.offer-card > div[style*="display: flex"][style*="gap: 0.5rem"] .btn-outline:hover {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+/* Requests section inside offer card */
+.offer-card > div[style*="border-top: 1px solid"] {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+.offer-card > div[style*="border-top: 1px solid"] h4 {
+    margin: 0 0 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--secondary-color);
+}
+.request-item {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius);
+    padding: 0.75rem 1rem;
+    margin-top: 0.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+.request-item > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.request-item strong {
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+.request-item .request-status {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 0.15rem 0.5rem;
+    background: #e2e8f0;
+    border-radius: 9999px;
+}
+.request-item .request-actions {
+    display: flex;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+}
+.request-item .btn {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* ===== Stats tab cards ===== */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+.stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+}
+.stat-card h3 {
+    margin: 0 0 0.5rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+.stat-card p {
+    margin: 0;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+/* ===== Modal form styling ===== */
+#edit-offer-form .form-group {
+    margin-bottom: 1rem;
+}
+#edit-offer-form label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--text-color);
+}
+#edit-offer-form .form-control {
+    width: 100%;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.95rem;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--text-color);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    box-sizing: border-box;
+}
+#edit-offer-form .form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-color) 25%, transparent);
+}
+
+/* Tabs styling */
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+.tab-btn {
+    padding: 0.75rem 1.5rem;
+    border-radius: var(--radius);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid transparent;
+}
+.tab-btn.active {
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+}
+.tab-btn:not(.active) {
+    background: var(--card-bg);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+}
+.tab-btn:not(.active):hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+.tab-panel {
+    display: none;
+}
+.tab-panel.active {
+    display: block;
+}
+
+/* Stats offers list - generated by loadCookStats JS */
+#stats-offers-list .offer-card {
+    /* Override for stats tab cards */
+    grid-template-columns: 1fr;
+    border-left: 4px solid var(--success-color);
+}
+#stats-offers-list .offer-card > img:first-child {
+    display: none; /* No images in stats tab */
+}
+#stats-offers-list .offer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+}
+#stats-offers-list .offer-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--secondary-color);
+}
+#stats-offers-list .offer-header .badge {
+    padding: 0.35rem 0.875rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+#stats-offers-list .offer-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 0.75rem 0;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+#stats-offers-list .offer-meta > div {
+    background: #f1f5f9;
+    padding: 0.35rem 0.75rem;
+    border-radius: 9999px;
+    font-weight: 500;
+}
+#stats-offers-list .offer-meta strong {
+    color: var(--secondary-color);
+    font-weight: 600;
+}
+
+/* ===== Active Offers: Larger/more prominent ===== */
+.offer-card:has(.badge-active) {
+    padding: 1.5rem;
+    gap: 1.5rem;
+    border-width: 2px;
+    border-color: #86efac;
+    box-shadow: 0 4px 16px -2px rgba(21, 128, 61, 0.15), var(--shadow);
+}
+.offer-card:has(.badge-active) > img:first-child {
+    width: 220px;
+    height: 170px;
+}
+.offer-card:has(.badge-active) .offer-header h3 {
+    font-size: 1.3rem;
+}
+.offer-card:has(.badge-active) > p:not(.offer-allergens):not(.offer-meta) {
+    font-size: 1rem;
+    line-height: 1.6;
+}
+.offer-card:has(.badge-active) > div[style*="display: flex"][style*="gap: 0.5rem"] .btn {
+    padding: 0.625rem 1.25rem;
+    font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+    .offer-card:has(.badge-active) > img:first-child {
+        width: 100%;
+        height: 220px;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .cook-grid {
+        grid-template-columns: 1fr !important;
+    }
+    .offer-card {
+        grid-template-columns: 1fr;
+    }
+    .offer-card > img:first-child {
+        width: 100%;
+        height: 200px;
+    }
+}

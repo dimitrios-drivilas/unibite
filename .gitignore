@@ -1,0 +1,28 @@
+# macOS
+.DS_Store
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# PHP
+vendor/
+composer.phar
+
+# Logs
+*.log
+error_log
+
+# Environment
+.env
+.env.local
+
+# Database (if using SQLite locally)
+*.sqlite
+*.db
+
+# Cache
+var/cache/
+*.cache
