@@ -18,7 +18,7 @@ jobs:
       
     - name: Security Risk Check
       run: |
-        # Απλός έλεγχος για επικίνδυνες συναρτήσεις (π.χ. eval, exec, passthru)
+  
         if grep -rnw '.' --include="*.php" -e 'eval(' -e 'passthru(' -e 'shell_exec('; then
           echo "Found potentially unsafe functions!"
           exit 1
