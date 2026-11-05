@@ -1,5 +1,8 @@
 <?php
 // Cook/api/get_points.php
+$silent_cron = true;
+require_once '../../cron/auto_expire.php';
+
 require_once '../../config/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {

@@ -71,6 +71,10 @@ try {
         $message = 'Το αίτημα απορρίφθηκε.';
     } elseif ($action === 'delivered') {
         // No points awarded at delivery. Points are awarded only via rating.
+        // Update status and set updated_at to NOW() for 48h penalty timer
+        $upd = $pdo->prepare("UPDATE requests SET status = ?, updated_at = NOW() WHERE id = ?");
+        $upd->execute([$new_status, $request_id]);
+        
         $message = 'Η παραλαβή επιβεβαιώθηκε. Οι πόντοι θα ανατεθούν μετά την αξιολόγηση.';
         // Check if offer should be completed or inactive
         $stmtCheck = $pdo->prepare("

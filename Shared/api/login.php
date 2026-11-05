@@ -53,11 +53,18 @@ if ($isValid) {
     
     session_write_close();
 
+    // Determine redirect URL based on roles
+    $redirectUrl = 'index.php';
+    if (in_array('admin', $roles, true) && !in_array('cook', $roles, true) && !in_array('consumer', $roles, true)) {
+        $redirectUrl = 'Admin/admin.php';
+    }
+
     echo json_encode([
         'success' => true,
         'message' => 'Επιτυχής σύνδεση!',
         'roles' => $roles,
-        'username' => $user['username']
+        'username' => $user['username'],
+        'redirect' => $redirectUrl
     ]);
     exit;
 } else {

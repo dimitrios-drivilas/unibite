@@ -37,6 +37,12 @@ $hasCook = in_array('cook', $userRoles, true);
 $hasConsumer = in_array('consumer', $userRoles, true);
 $hasAdmin = in_array('admin', $userRoles, true);
 
+// Redirect admin users to their dedicated dashboard
+if ($hasAdmin && !$hasCook && !$hasConsumer) {
+    header('Location: Admin/admin.php');
+    exit;
+}
+
 // ===== SERVER-SIDE DATA FETCHING FOR DASHBOARD =====
 $current_points = 0;
 $cook_offers_count = 0;

@@ -47,7 +47,9 @@ class UniBiteAuth {
 
         if (result.success && result.roles) {
             this.showToast('Επιτυχής σύνδεση! Μεταφορά...', 'success');
-            setTimeout(() => { window.location.href = 'index.php'; }, 300);
+            setTimeout(() => { 
+                window.location.href = result.redirect || 'index.php'; 
+            }, 300);
         } else {
             this.showToast(result.error || 'Σφάλμα σύνδεσης.', 'error');
         }

@@ -15,15 +15,14 @@ $user = authGuard(['admin']);
 <body>
     <header>
         <div class="navbar-brand" style="display: flex; align-items: center; gap: 12px;">
-            <a href="../index.php" style="text-decoration: none; font-size: 1.5rem; font-weight: 800; color: #FFFFFF; display: flex; align-items: center;">
+            <a href="Admin/admin.php" style="text-decoration: none; font-size: 1.5rem; font-weight: 800; color: #FFFFFF; display: flex; align-items: center;">
                 Uni<span style="color: #FB923C;">Bite</span>
             </a>
             <span style="background: #1E293B; color: #94A3B8; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 12px; letter-spacing: 0.5px;">CAMPUS FOOD</span>
-            <span style="color: #CBD5E1; font-size: 0.85rem; margin-left: 6px;">[Διαχειριστής: <?= htmlspecialchars($user['username']) ?>]</span>
+            <span style="color: #CBD5E1; font-size: 0.85rem; margin-left: 6px;">[🛡️ Διαχειριστής: <?= htmlspecialchars($user['username']) ?>]</span>
         </div>
         <nav>
             <ul>
-                <li><a href="../index.php">Αρχική</a></li>
                 <li><a href="#" onclick="UniBiteAuth.logout('../index.php')" style="background: rgba(220, 38, 38, 0.15); color: #EF4444; border: 1px solid #DC2626; padding: 7px 16px; border-radius: 8px; text-decoration: none; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center;">Αποσύνδεση</a></li>
             </ul>
         </nav>
