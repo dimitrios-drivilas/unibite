@@ -1,5 +1,7 @@
 <?php
 // Admin/api/admin_delete_offer.php
+header('Content-Type: application/json; charset=UTF-8');
+
 require_once '../../config/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -22,9 +24,28 @@ if ($offer_id <= 0) {
     exit;
 }
 
-$stmt = $pdo->prepare("DELETE FROM offers WHERE id = ?");
-if ($stmt->execute([$offer_id])) {
-    echo json_encode(['success' => true, 'message' => 'Η αγγελία διαγράφηκε.']);
-} else {
-    echo json_encode(['success' => false, 'error' => 'Αποτυχία διαγραφής.']);
+try {
+    $pdo->beginTransaction();
+
+    // Soft delete: mark as cancelled (not expired) for consistency
+    $stmt = $pdo->prepare("UPDATE offers SET status = 'cancelled', expires_at = NOW() WHERE id = ?");
+    $stmt->execute([$offer_id]);
+
+    if ($stmt->rowCount() === 0) {
+        $pdo->rollBack();
+        echo json_encode(['success' => false, 'error' => 'Δεν βρέθηκε η αγγελία.']);
+        exit;
+    }
+
+    // Cancel any pending requests for this offer
+    $pdo->prepare("UPDATE requests SET status = 'cancelled' WHERE offer_id = ? AND status = 'pending'")->execute([$offer_id]);
+
+    $pdo->commit();
+    echo json_encode(['success' => true, 'message' => 'Η αγγελία ακυρώθηκε από διαχειριστή και τα εκκρεμή αιτήματα ανнулиώθηκε.']);
+
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
+    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }

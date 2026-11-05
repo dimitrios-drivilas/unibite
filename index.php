@@ -378,7 +378,7 @@ if ($isLoggedIn) {
                             <?php if ($hasConsumer): ?>
                             <div class="stat-item" style="background:#F8FAFC; border-radius:12px; padding:1rem; border:1px solid #E2E8F0;">
                                 <div style="font-size:1.75rem; font-weight:700; color:#2563EB;" id="stat-meals"><?= $consumer_delivered_count ?></div>
-                                <div style="font-size:0.8rem; color:#64748B; margin-top:0.25rem;">Γεύματα που Πέρασα</div>
+                                <div style="font-size:0.8rem; color:#64748B; margin-top:0.25rem;">Γεύματα που Παρέλαβα</div>
                             </div>
                             <?php endif; ?>
                             <?php if (!$hasCook && !$hasConsumer): ?>

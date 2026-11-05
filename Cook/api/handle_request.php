@@ -1,5 +1,7 @@
 <?php
 // Cook/api/handle_request.php
+header('Content-Type: application/json; charset=UTF-8');
+
 require_once '../../config/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {
@@ -64,11 +66,11 @@ try {
         $pdo->prepare("UPDATE offers SET portions = portions - 1 WHERE id = ?")->execute([$request['offer_id']]);
         // If portions depleted, mark offer inactive so it doesn't appear in feed
         $pdo->prepare("UPDATE offers SET status = 'inactive' WHERE id = ? AND portions <= 0")->execute([$request['offer_id']]);
-        $message = 'Το αίτημα εγκρίθηκε. Μερίδα δεσμεύτηκε (-1 ποντός από καταναλωτή).';
+        $message = 'Το αίτημα εγκρίθηκε. Μερίδα δεσμεύτηκε (-1 πόντους από καταναλωτή).';
     } elseif ($action === 'reject') {
         $message = 'Το αίτημα απορρίφθηκε.';
     } elseif ($action === 'delivered') {
-        // Points for cook will be awarded when rating is submitted
+        // No points awarded at delivery. Points are awarded only via rating.
         $message = 'Η παραλαβή επιβεβαιώθηκε. Οι πόντοι θα ανατεθούν μετά την αξιολόγηση.';
         // Check if offer should be completed or inactive
         $stmtCheck = $pdo->prepare("
@@ -88,9 +90,12 @@ try {
             $pdo->prepare("UPDATE offers SET status = 'inactive' WHERE id = ?")->execute([$request['offer_id']]);
         }
     } elseif ($action === 'absent') {
-        // Penalty: -1 point for no-show
+        // Penalty: -1 point for no-show (point was deducted at approve, now additional -1 penalty)
         $pdo->prepare("UPDATE users SET points = points - 1 WHERE id = ?")->execute([$consumer_id]);
-        $message = 'Καταχωρήθηκε απουσία. -1 ποντός πρόστιμο.';
+        // Restore portion to offer and reactivate if not expired
+        $pdo->prepare("UPDATE offers SET portions = portions + 1 WHERE id = ?")->execute([$request['offer_id']]);
+        $pdo->prepare("UPDATE offers SET status = 'active' WHERE id = ? AND expires_at > NOW() AND status IN ('inactive', 'completed')")->execute([$request['offer_id']]);
+        $message = 'Καταχωρήθηκε απουσία. -1 πόντους πρόστιμο στον καταναλωτή. Η μερίδα επαναφέρθηκε στην αγγελία.';
     }
     
     $pdo->commit();

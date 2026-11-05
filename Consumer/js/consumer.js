@@ -1,19 +1,70 @@
 // Consumer/js/consumer.js
 
-let map;
-let markers = [];
-let currentRatingOfferId = null;
-let userLocation = null; // {lat, lon, address}
-let locationMap = {}; // ID -> name mapping from upatras_locations.json
+let map = null;
+let markersLayer = null;
+let userMarker = null;
+let userLocation = { lat: null, lon: null };
+
+const LOCATION_LABELS = {
+    'fep-building-a': 'ΦΕΠ - Κτίριο Α (Κοιτώνες)',
+    'fep-building-b': 'ΦΕΠ - Κτίριο Β (Κοιτώνες)',
+    'fep-building-c': 'ΦΕΠ - Κτίριο Γ (Κοιτώνες)',
+    'fep-building-z': 'ΦΕΠ - Κτίριο Ζ (Κοιτώνες)',
+    'fep-building-h': 'ΦΕΠ - Κτίριο Η (Κοιτώνες)',
+    'fep-building-th': 'ΦΕΠ - Κτίριο Θ (Κοιτώνες)',
+    'fep-canteen': 'Φοιτητική Λέσχη / Εστιατόριο Ρίου',
+    'admin-building-a': 'Κτίριο Α - Διοίκηση / Πρυτανεία',
+    'building-b': 'Κτίριο Β - Πολυτεχνική / Αρχιτέκτονες',
+    'ceid-building': 'CEID - Μηχανικοί Η/Υ & Πληροφορικής',
+    'ece-building': 'ECE - Ηλεκτρολόγοι Μηχανικοί & Τ.Υ.',
+    'mech-aero-building': 'Μηχανολόγοι & Αεροναυπηγοί Μηχανικοί',
+    'civil-eng-building': 'Πολιτικοί Μηχανικοί',
+    'chem-eng-building': 'Χημικοί Μηχανικοί',
+    'med-preclinical-building': 'Ιατρική - Προκλινικά / Αμφιθέατρα',
+    'med-clinical-building': 'Ιατρική - Κλινικές / Νοσοκομείο',
+    'physics-math-building': 'Φυσική / Μαθηματικά',
+    'chemistry-building-north': 'Χημεία - Βόρειο Κτίριο',
+    'chemistry-building-south': 'Χημεία - Νότιο Κτίριο',
+    'biology-building': 'Βιολογία / Μαθηματικά',
+    'geology-building': 'Γεωλογία',
+    'education-social-work-building': 'Επιστήμες Εκπαίδευσης & Κοιν. Εργασίας',
+    'central-library': 'Κεντρική Βιβλιοθήκη',
+    'conference-center': 'Συνεδριακό & Πολιτιστικό Κέντρο',
+    'peace-park': 'Πάρκο Ειρήνης',
+    'koukouli-dormitory': 'Φοιτητική Εστία Κουκούλι',
+    'koukouli-admin-building': 'Κεντρικό Κτίριο - Διοίκηση (Κουκούλι)',
+    'koukouli-student-union': 'Φοιτητική Λέσχη Κουκούλι'
+};
+
+function formatLocationName(loc) {
+    return LOCATION_LABELS[loc] || loc;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
+    loadFeed();
+    loadMyRequests();
     loadUserPoints();
-    loadLocationMap().then(() => {
-        loadFeed();
-        loadMyRequests();
+
+    const sortSelect = document.getElementById('sort-by');
+    const limitSelect = document.getElementById('results-limit');
+    const distanceInput = document.getElementById('max-distance');
+
+    [sortSelect, limitSelect, distanceInput].forEach(el => {
+        if (el) el.addEventListener('change', loadFeed);
     });
 });
+
+function initMap() {
+    const mapEl = document.getElementById('map');
+    if (!mapEl || typeof L === 'undefined') return;
+
+    map = L.map('map').setView([38.2918, 21.7855], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
+}
 
 async function loadUserPoints() {
     const result = await UniBiteAuth.apiCall('api/get_points.php', {}, 'GET');
@@ -23,131 +74,299 @@ async function loadUserPoints() {
     }
 }
 
-function initMap() {
-    try {
-        map = L.map('map').setView([37.983810, 23.727539], 14);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-    } catch (e) {
-        console.error('Map initialization failed:', e);
-    }
-}
-
-async function loadLocationMap() {
-    try {
-        const response = await fetch('../upatras_locations.json');
-        if (response.ok) {
-            const data = await response.json();
-            data.locations.forEach(loc => {
-                locationMap[loc.id] = loc.name;
-            });
-        }
-    } catch (e) {
-        console.warn('Could not load location map:', e);
-    }
-}
-
-function getLocationName(locationId) {
-    return locationMap[locationId] || locationId;
-}
-
-function getFilterParams() {
-    const params = new URLSearchParams();
-    const sortBy = document.getElementById('sort-by')?.value || 'created_desc';
-    const limit = document.getElementById('results-limit')?.value || 50;
-
-    params.set('sort', sortBy);
-    params.set('limit', limit);
-
-    if (userLocation) {
-        params.set('lat', userLocation.lat);
-        params.set('lon', userLocation.lon);
-        const maxDistance = document.getElementById('max-distance')?.value || 10;
-        params.set('max_distance', maxDistance);
-    }
-
-    return params;
-}
-
 async function loadFeed() {
-    const params = getFilterParams();
-    const queryString = params.toString();
-    const url = 'api/fetch_feed.php' + (queryString ? '?' + queryString : '');
-
-    const result = await UniBiteAuth.apiCall(url, {}, 'GET');
     const container = document.getElementById('meals-feed');
     if (!container) return;
+    container.innerHTML = '<p style="color: var(--text-muted);">Φόρτωση ενεργών γευμάτων...</p>';
 
-    if (!result.success) {
-        container.innerHTML = '<p style="color: var(--danger-color);">' + (result.error || 'Σφάλμα φόρτωσης ροής.') + '</p>';
-        return;
+    const sortBy = document.getElementById('sort-by')?.value || 'created_desc';
+    const limit = document.getElementById('results-limit')?.value || 50;
+    const maxDistance = document.getElementById('max-distance')?.value || 10;
+
+    const params = new URLSearchParams({
+        sort: sortBy,
+        limit: limit,
+        max_distance: maxDistance
+    });
+
+    if (userLocation.lat !== null && userLocation.lon !== null) {
+        params.set('lat', userLocation.lat);
+        params.set('lon', userLocation.lon);
     }
 
-    // Safe map cleanup
     try {
-        if (markers && map) {
-            markers.forEach(m => map.removeLayer(m));
-        }
-    } catch (e) {
-        console.warn('Map cleanup failed:', e);
-    }
-    markers = [];
+        const response = await fetch(`api/fetch_feed.php?${params.toString()}`, {
+            method: 'GET',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
 
-    if (result.offers.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted);">Δεν υπάρχουν διαθέσιμα γεύματα που να ταιριάζουν στα φίλτρα.</p>';
+        if (!result.success) {
+            container.innerHTML = '<p style="color: var(--danger-color);">' + (result.error || 'Σφάλμα φόρτωσης γευμάτων.') + '</p>';
+            return;
+        }
+
+        renderFeed(result.offers, container);
+
+    } catch (error) {
+        console.error('loadFeed error:', error);
+        container.innerHTML = '<p style="color: var(--danger-color);">Σφάλμα σύνδεσης.</p>';
+    }
+}
+
+function updateMapMarkers(offers) {
+    if (!map || !markersLayer) return;
+    markersLayer.clearLayers();
+
+    const bounds = [];
+
+    if (userLocation.lat !== null && userLocation.lon !== null) {
+        const uMarker = L.circleMarker([userLocation.lat, userLocation.lon], {
+            radius: 8,
+            fillColor: '#2563EB',
+            color: '#FFFFFF',
+            weight: 2,
+            opacity: 1,
+            fillOpacity: 0.9
+        }).bindPopup('<b>📍 Η θέση μου</b>');
+        uMarker.addTo(markersLayer);
+        bounds.push([userLocation.lat, userLocation.lon]);
+    }
+
+    if (offers && offers.length > 0) {
+        offers.forEach(offer => {
+            const lat = parseFloat(offer.latitude);
+            const lng = parseFloat(offer.longitude);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                const isInactive = offer.display_status === 'inactive' || parseInt(offer.portions) <= 0;
+                const markerColor = isInactive ? '#94A3B8' : '#EA580C';
+
+                const customIcon = L.divIcon({
+                    className: 'custom-meal-pin',
+                    html: `<div style="background:${markerColor}; color:#fff; width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; border:2px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,0.35); opacity:${isInactive ? '0.6' : '1'};">${offer.portions}</div>`,
+                    iconSize: [30, 30],
+                    iconAnchor: [15, 15]
+                });
+
+                const popupHtml = `
+                    <div style="min-width: 180px;">
+                        <h4 style="margin:0 0 4px; color:#0F172A;">${escapeHtml(offer.title)}</h4>
+                        <p style="margin:0 0 4px; font-size:0.85rem; color:#475569;">📍 ${escapeHtml(formatLocationName(offer.pickup_location))}</p>
+                        <p style="margin:0 0 6px; font-size:0.85rem;">🥣 Μερίδες: <strong>${offer.portions}</strong> | 👨‍🍳 ${escapeHtml(offer.cook_name)}</p>
+                        ${!isInactive ? `<button onclick="makeRequest(${offer.id})" style="width:100%; padding:5px 8px; background:#EA580C; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:600;">Αίτηση Μερίδας</button>` : `<span style="color:#DC2626; font-size:0.8rem; font-weight:600;">Εξαντλημένο</span>`}
+                    </div>
+                `;
+
+                const marker = L.marker([lat, lng], { icon: customIcon }).bindPopup(popupHtml);
+                marker.addTo(markersLayer);
+                bounds.push([lat, lng]);
+            }
+        });
+    }
+
+    if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [35, 35], maxZoom: 16 });
+    }
+}
+
+function renderFeed(offers, container) {
+    updateMapMarkers(offers);
+
+    if (!offers || offers.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Δεν βρέθηκαν διαθέσιμα γεύματα με τα τρέχοντα φίλτρα.</p>';
         updateFilterInfo(0);
         return;
     }
 
-    updateFilterInfo(result.offers.length);
+    updateFilterInfo(offers.length);
 
-    container.innerHTML = result.offers.map(offer => {
-        const locationName = getLocationName(offer.pickup_location);
-        // Create marker if map is available
-        if (offer.latitude && offer.longitude && map) {
-            try {
-                const marker = L.marker([offer.latitude, offer.longitude]).addTo(map)
-                    .bindPopup('<b>' + escapeHtml(offer.title) + '</b><br>' + escapeHtml(locationName) + '<br>Μερίδες: ' + offer.portions + (offer.distance_km ? '<br>Απόσταση: ' + offer.distance_km + ' km' : ''));
-                markers.push(marker);
-            } catch (e) {
-                console.warn('Marker creation failed:', e);
-            }
-        }
+    container.innerHTML = offers.map(offer => {
+        const photoSrc = offer.photo ? '../' + offer.photo.replace(/^(\.\.\/)+/, '') : '';
+        return `
+        <div class="meal-card offer-card ${offer.display_status === 'inactive' ? 'inactive inactive-offer' : ''}" style="${offer.display_status === 'inactive' ? 'opacity: 0.6; border-left: 4px solid var(--warning-color);' : 'border-left: 4px solid var(--primary-color);'}">
+            ${photoSrc ? '<img src="' + escapeHtml(photoSrc) + '" alt="" style="width:100%; max-height:180px; object-fit:cover; border-radius:8px 8px 0 0; margin-bottom:0.5rem;">' : ''}
+            <div style="padding: 0.5rem 0.5rem 0;">
+                <div class="offer-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                    <h3 style="margin: 0; color: var(--secondary-color);">${escapeHtml(offer.title)}</h3>
+                    <span class="badge badge-${offer.display_status}">${translateDisplayStatus(offer.display_status)}</span>
+                </div>
+                <p style="margin: 0.5rem 0; color: var(--text-color);">${escapeHtml(offer.description)}</p>
+                ${offer.allergens ? '<p style="font-size:0.75rem; color:var(--text-muted); margin:0.25rem 0;"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : ''}
+                <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 0.5rem 0; font-size: 0.85rem; color: var(--text-muted);">
+                    <span>🥣 <strong>${offer.portions}</strong> μερίδες</span>
+                    <span>📍 ${escapeHtml(formatLocationName(offer.pickup_location))}</span>
+                    <span>⏰ ${formatDateTime(offer.pickup_time)}</span>
+                    ${offer.distance_km !== null && offer.distance_km !== undefined ? `<span>📏 ${offer.distance_km} km</span>` : ''}
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+                    ${offer.avg_rating > 0 ? `<span style="color: var(--warning-color);">⭐ ${parseFloat(offer.avg_rating).toFixed(1)} (${offer.rating_count})</span>` : ''}
+                    <span style="font-size: 0.8rem; color: var(--text-muted);">από ${escapeHtml(offer.cook_name)}</span>
+                </div>
+                <button class="btn btn-primary" style="margin-top: 1rem; width: 100%;" 
+                        onclick="makeRequest(${offer.id})" 
+                        ${offer.display_status === 'inactive' || offer.portions <= 0 ? 'disabled' : ''}>
+                    ${offer.display_status === 'inactive' || offer.portions <= 0 ? 'Εξαντλημένο' : 'Αίτηση Μερίδας'}
+                </button>
+            </div>
+        </div>
+    `}).join('');
+}
 
-        const isInactive = offer.display_status === 'inactive' || offer.portions <= 0;
-        const canRate = offer.can_rate > 0 && offer.already_rated === 0;
-        const cardClass = isInactive ? 'meal-card inactive' : 'meal-card';
-        const badgeClass = isInactive ? 'badge-inactive' : 'badge-active';
-        const badgeText = isInactive ? 'Εξαντλημένο' : offer.portions + ' μερίδες';
-        const distanceInfo = offer.distance_km !== undefined ? '<br>📏 Απόσταση: <strong>' + offer.distance_km + ' km</strong>' : '';
-        const ratingDisplay = offer.rating_count > 0 ? '⭐ ' + parseFloat(offer.avg_rating).toFixed(1) : '-';
+async function loadMyRequests() {
+    const container = document.getElementById('my-requests');
+    if (!container) return;
+    container.innerHTML = '<p style="color: var(--text-muted);">Φόρτωση αιτημάτων...</p>';
 
-        return '\n            <div class="' + cardClass + '" id="meal-' + offer.id + '">\n                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">\n                    <h3 style="color: var(--secondary-color);">' + escapeHtml(offer.title) + '</h3>\n                    <span class="badge ' + badgeClass + '">' + badgeText + '</span>\n                </div>\n                ' + (offer.allergens ? '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.5rem 0;"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : '') + '\n                <p style="margin-bottom: 0.5rem;">' + escapeHtml(offer.description) + '</p>\n                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">\n                    👨‍🍳 Μάγειρας: <strong>' + escapeHtml(offer.cook_name) + '</strong> (' + ratingDisplay + ')<br>\n                    📍 Σημείο: <strong>' + escapeHtml(locationName) + '</strong>' + distanceInfo + '<br>\n                    ⏰ Παραλαβή έως: ' + offer.pickup_time + '\n                </p>\n                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">\n                    ' + (!isInactive ? '<button class="btn btn-primary" onclick="makeRequest(' + offer.id + ')">Δέσμευση Μερίδας</button>' : '<button class="btn btn-outline" disabled style="opacity: 0.5;">Δεν υπάρχουν μερίδες</button>') + '\n                </div>\n            </div>\n        ';
-    }).join('');
-
-    // Fit map to markers if available
     try {
-        if (markers.length > 0 && map) {
-            const group = new L.featureGroup(markers);
-            map.fitBounds(group.getBounds().pad(0.1));
+        const result = await UniBiteAuth.apiCall('api/get_my_requests.php', {}, 'GET');
+
+        if (!result.success) {
+            container.innerHTML = '<p style="color: var(--danger-color);">' + (result.error || 'Σφάλμα φόρτωσης αιτημάτων.') + '</p>';
+            return;
         }
-    } catch (e) {
-        console.warn('Map fitBounds failed:', e);
+
+        renderMyRequests(result.requests, container);
+
+    } catch (error) {
+        console.error('loadMyRequests error:', error);
+        container.innerHTML = '<p style="color: var(--danger-color);">Σφάλμα σύνδεσης.</p>';
     }
 }
 
-function updateFilterInfo(count) {
-    const infoEl = document.getElementById('filter-info');
-    if (!infoEl) return;
-
-    let text = 'Βρέθηκαν <strong>' + count + '</strong> γεύματα';
-    if (userLocation) {
-        const maxDist = document.getElementById('max-distance')?.value || 10;
-        text += ' εντός ' + maxDist + ' km από την θέση σας';
+function renderMyRequests(requests, container) {
+    if (!requests || requests.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted); text-align: center; padding: 2rem;">Δεν έχετε κάνει κανένα αίτημα ακόμα.</p>';
+        return;
     }
-    infoEl.innerHTML = text;
+
+    container.innerHTML = requests.map(req => `
+        <div class="meal-card offer-card" style="border-left: 4px solid ${getRequestStatusColor(req.status)};">
+            <div class="offer-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0;">${escapeHtml(req.title)}</h3>
+                <span class="badge badge-${req.status}">${translateRequestStatus(req.status)}</span>
+            </div>
+            <p style="margin: 0.5rem 0; color: var(--text-muted); font-size: 0.9rem;">
+                📍 ${escapeHtml(formatLocationName(req.pickup_location))} | ⏰ ${formatDateTime(req.pickup_time)} | 👨‍🍳 ${escapeHtml(req.cook_name)}
+            </p>
+            <p style="font-size: 0.85rem; color: var(--text-muted);">Αιτήθηκε: ${formatDateTime(req.created_at)}</p>
+            ${req.status === 'delivered' && !Number(req.is_rated) ? `
+                <button class="btn btn-outline" style="margin-top: 0.5rem; width: 100%;" onclick="openRatingModal(${req.offer_id})">
+                    ⭐ Αξιολόγηση Γεύματος
+                </button>
+            ` : ''}
+            ${req.status === 'pending' ? `
+                <button class="btn btn-danger" style="margin-top: 0.5rem; width: 100%;" onclick="cancelRequest(${req.id})">
+                    Ακύρωση Αιτήματος
+                </button>
+            ` : ''}
+            ${Number(req.is_rated) ? '<p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--success-color);">✅ Αξιολογημένο</p>' : ''}
+        </div>
+    `).join('');
+}
+
+async function makeRequest(offerId) {
+    const result = await UniBiteAuth.apiCall('api/make_request.php', { offer_id: offerId }, 'POST');
+    if (result.success) {
+        UniBiteAuth.showToast(result.message, 'success');
+        loadFeed();
+        loadMyRequests();
+        loadUserPoints();
+    } else {
+        UniBiteAuth.showToast(result.error || 'Σφάλμα αίτησης.', 'error');
+    }
+}
+
+async function cancelRequest(requestId) {
+    if (!confirm('Είστε σίγουρος ότι θέλετε να ακυρώσετε αυτό το αίτημα;')) return;
+    const result = await UniBiteAuth.apiCall('api/cancel_request.php', { request_id: requestId }, 'POST');
+    if (result.success) {
+        UniBiteAuth.showToast(result.message, 'success');
+        loadMyRequests();
+        loadFeed();
+    } else {
+        UniBiteAuth.showToast(result.error || 'Σφάλμα ακύρωσης.', 'error');
+    }
+}
+
+function openRatingModal(offerId) {
+    document.getElementById('rating-offer-id').value = offerId;
+    document.getElementById('rating-stars').value = '5';
+    document.getElementById('rating-comment').value = '';
+    document.getElementById('rating-modal').classList.add('active');
+}
+
+function closeRatingModal() {
+    document.getElementById('rating-modal').classList.remove('active');
+}
+
+document.getElementById('rating-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const offerId = document.getElementById('rating-offer-id').value;
+    const rating = document.getElementById('rating-stars').value;
+    const comment = document.getElementById('rating-comment').value;
+
+    const result = await UniBiteAuth.apiCall('api/submit_rating.php', {
+        offer_id: offerId,
+        rating: parseInt(rating),
+        comment: comment
+    }, 'POST');
+
+    if (result.success) {
+        UniBiteAuth.showToast(result.message, 'success');
+        closeRatingModal();
+        loadMyRequests();
+        loadFeed();
+    } else {
+        UniBiteAuth.showToast(result.error || 'Σφάλμα υποβολής αξιολόγησης.', 'error');
+    }
+});
+
+document.getElementById('rating-modal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeRatingModal();
+});
+
+async function geocodeUserLocation() {
+    const locationInput = document.getElementById('user-location');
+    const query = locationInput?.value?.trim();
+    if (!query) {
+        UniBiteAuth.showToast('Γράψτε μια τοποθεσία πρώτα.', 'error');
+        return;
+    }
+
+    try {
+        // First check against local upatras_locations.json
+        const localRes = await fetch('../upatras_locations.json');
+        if (localRes.ok) {
+            const localData = await localRes.json();
+            const qLower = query.toLowerCase();
+            const matched = (localData.locations || []).find(loc =>
+                loc.name.toLowerCase().includes(qLower) || loc.id.toLowerCase().includes(qLower)
+            );
+            if (matched) {
+                userLocation.lat = parseFloat(matched.lat);
+                userLocation.lon = parseFloat(matched.lng);
+                UniBiteAuth.showToast(`Τοποθεσία βρέθηκε: ${matched.name}`, 'success');
+                loadFeed();
+                return;
+            }
+        }
+
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Πάτρα, Ελλάδα')}&limit=1`);
+        const data = await response.json();
+
+        if (data.length > 0) {
+            userLocation.lat = parseFloat(data[0].lat);
+            userLocation.lon = parseFloat(data[0].lon);
+            UniBiteAuth.showToast(`Τοποθεσία βρέθηκε: ${data[0].display_name}`, 'success');
+            loadFeed();
+        } else {
+            UniBiteAuth.showToast('Δεν βρέθηκε η τοποθεσία. Δοκιμάστε άλλη.', 'error');
+        }
+    } catch (error) {
+        console.error('Geocoding error:', error);
+        UniBiteAuth.showToast('Σφάλμα αναζήτησης τοποθεσίας.', 'error');
+    }
 }
 
 function resetFilters() {
@@ -155,174 +374,66 @@ function resetFilters() {
     document.getElementById('max-distance').value = '10';
     document.getElementById('sort-by').value = 'created_desc';
     document.getElementById('results-limit').value = '50';
-    userLocation = null;
+    userLocation = { lat: null, lon: null };
     loadFeed();
 }
 
-async function geocodeUserLocation() {
-    const locationInput = document.getElementById('user-location');
-    const location = locationInput.value.trim();
-    if (!location) {
-        UniBiteAuth.showToast('Εισάγετε μια τοποθεσία', 'error');
-        return;
-    }
-
-    try {
-        const response = await fetch('https://nominatim.openstreetmap.org/search?format=json&q=' + encodeURIComponent(location + ', Αθήνα, Ελλάδα') + '&limit=1');
-        const data = await response.json();
-        if (data.length > 0) {
-            userLocation = {
-                lat: parseFloat(data[0].lat),
-                lon: parseFloat(data[0].lon),
-                address: data[0].display_name
-            };
-            locationInput.value = data[0].display_name.split(',')[0];
-            UniBiteAuth.showToast('Τοποθεσία βρέθηκε: ' + userLocation.address.split(',')[0], 'success');
-            loadFeed();
-        } else {
-            UniBiteAuth.showToast('Δεν βρέθηκε η τοποθεσία', 'error');
-        }
-    } catch (e) {
-        console.error('Geocoding error:', e);
-        UniBiteAuth.showToast('Σφάλμα geocoding', 'error');
+function updateFilterInfo(count) {
+    const info = document.getElementById('filter-info');
+    if (info) {
+        const hasLocation = userLocation.lat !== null;
+        info.textContent = `Βρέθηκαν ${count} γεύματα${hasLocation ? ' εντός ' + document.getElementById('max-distance').value + ' km από την τοποθεσία σας' : ''}.`;
     }
 }
 
-async function loadMyRequests() {
-    const result = await UniBiteAuth.apiCall('api/get_my_requests.php', {}, 'GET');
-    const container = document.getElementById('my-requests');
-    if (!container) return;
-
-    if (!result.success) {
-        container.innerHTML = '<p style="color: var(--danger-color);">' + (result.error || 'Σφάλμα φόρτωσης αιτημάτων.') + '</p>';
-        return;
-    }
-
-    if (result.requests.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted);">Δεν έχετε κάνει καμία αίτηση ακόμα.</p>';
-        return;
-    }
-
-    container.innerHTML = result.requests.map(req => {
-        const statusClass = 'badge-' + req.status;
-        const statusLabel = translateStatus(req.status);
-        let actions = '';
-
-        if (req.status === 'approved') {
-            actions = '<button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; background-color: var(--success-color);" onclick="markAsPickedUp(' + req.id + ')">Παραλάβει</button>';
-        } else if (req.status === 'pending') {
-            actions = '<button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="cancelRequest(' + req.id + ')">Ακύρωση</button>';
-        }
-
-        const locationName = getLocationName(req.pickup_location);
-
-        return '\n            <div class="meal-card" style="border-left: 4px solid var(--primary-color);">\n                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">\n                    <h3 style="color: var(--secondary-color);">' + escapeHtml(req.title) + '</h3>\n                    <span class="badge ' + statusClass + '">' + statusLabel + '</span>\n                </div>\n                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.5rem;">\n                    👨‍🍳 Μάγειρας: <strong>' + escapeHtml(req.cook_name) + '</strong><br>\n                    📍 Σημείο: <strong>' + escapeHtml(locationName) + '</strong><br>\n                    ⏰ Παραλαβή: ' + req.pickup_time + '\n                </p>\n                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">\n                    ' + actions + '\n                    ' + (req.status === 'delivered' && !req.rated ? '<button class="btn btn-outline" type="button" onclick="openRatingModal(event, ' + req.offer_id + ')">Αξιολόγηση</button>' : '') + '\n                </div>\n            </div>\n        ';
-    }).join('');
-}
-
-async function makeRequest(offerId) {
-    const result = await UniBiteAuth.apiCall('api/make_request.php', { offer_id: offerId }, 'POST');
-    if (result.success) {
-        UniBiteAuth.showToast(result.message, 'success');
-        loadMyRequests();
-        loadFeed();
-        loadUserPoints();
-    } else {
-        UniBiteAuth.showToast(result.error || 'Σφάλμα δέσμευσης.', 'error');
+function getRequestStatusColor(status) {
+    switch(status) {
+        case 'pending': return 'var(--warning-color)';
+        case 'approved': return 'var(--primary-color)';
+        case 'delivered': return 'var(--success-color)';
+        case 'absent': return 'var(--danger-color)';
+        case 'rejected': return 'var(--danger-color)';
+        case 'cancelled': return 'var(--text-muted)';
+        default: return 'var(--border-color)';
     }
 }
 
-async function cancelRequest(requestId) {
-    if (!confirm('Είστε σίγουρος ότι θέλετε να ακυρώσετε το αίτημα;')) return;
-    const result = await UniBiteAuth.apiCall('api/cancel_request.php', { request_id: requestId }, 'POST');
-    if (result.success) {
-        UniBiteAuth.showToast(result.message, 'success');
-        loadMyRequests();
-        loadFeed();
-        loadUserPoints();
-    } else {
-        UniBiteAuth.showToast(result.error || 'Σφάλμα ακύρωσης.', 'error');
-    }
-}
-
-async function markAsPickedUp(requestId) {
-    UniBiteAuth.showToast('Η παραλαβή επιβεβαιώνεται από τον μάγειρα.', 'success');
-}
-
-window.openRatingModal = function (event, offerId) {
-    if (event) {
-        event.preventDefault();
-        event.stopPropagation();
-    }
-
-    currentRatingOfferId = offerId;
-    const offerInput = document.getElementById('rating-offer-id');
-    const starsInput = document.getElementById('rating-stars');
-    const commentInput = document.getElementById('rating-comment');
-
-    if (offerInput) offerInput.value = offerId;
-    if (starsInput) starsInput.value = '5';
-    if (commentInput) commentInput.value = '';
-
-    const modal = document.getElementById('dashboard-rating-modal');
-    if (modal) {
-        modal.classList.add('active');
-        // Αποτροπή άμεσου κλεισίματος από άλλα click events
-        modal.dataset.justOpened = 'true';
-        setTimeout(() => { modal.dataset.justOpened = 'false'; }, 200);
-    }
-};
-
-function closeRatingModal() {
-    const modal = document.getElementById('dashboard-rating-modal');
-    if (!modal) return;
-    
-    if (modal.dataset.justOpened === 'true') {
-        console.warn('Αποτράπηκε το άμεσο κλείσιμο του modal.');
-        return; 
-    }
-
-    modal.classList.remove('active');
-    currentRatingOfferId = null;
-}
-
-document.getElementById('rating-form')?.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const offerId = document.getElementById('rating-offer-id').value;
-    const rating = parseInt(document.getElementById('rating-stars').value);
-    const comment = document.getElementById('rating-comment').value.trim();
-
-    const result = await UniBiteAuth.apiCall('api/submit_rating.php', { offer_id: offerId, rating, comment }, 'POST');
-    if (result.success) {
-        UniBiteAuth.showToast(result.message, 'success');
-        closeRatingModal();
-        loadFeed();
-        loadMyRequests();
-        loadUserPoints();
-    } else {
-        UniBiteAuth.showToast(result.error || 'Σφάλμα αξιολόγησης.', 'error');
-    }
-});
-
-function translateStatus(status) {
-    switch (status) {
+function translateRequestStatus(status) {
+    switch(status) {
         case 'pending': return 'Σε Αναμονή';
         case 'approved': return 'Εγκεκριμένο';
-        case 'rejected': return 'Απορριφθέν';
-        case 'delivered': return 'Παραδοθέν';
-        case 'absent': return 'Απουσία';
-        case 'cancelled': return 'Ακυρωμένο';
+        case 'delivered': return 'Παραδόθηκε';
+        case 'absent': return 'Απών';
+        case 'rejected': return 'Απορρίφθηκε';
+        case 'cancelled': return 'Ακυρώθηκε';
         default: return status;
     }
 }
 
+function translateDisplayStatus(status) {
+    switch(status) {
+        case 'active': return 'Διαθέσιμο';
+        case 'inactive': return 'Εξαντλημένο';
+        default: return status;
+    }
+}
+
+function formatDateTime(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 function escapeHtml(str) {
-    return str.replace(/[&<>'"]/g, function (tag) {
-        if (tag === '&') return '&';
-        if (tag === '<') return '<';
-        if (tag === '>') return '>';
-        if (tag === "'") return '&apos;';
-        if (tag === '"') return '"';
-        return tag;
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, function(tag) {
+        const chars = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        };
+        return chars[tag] || tag;
     });
 }

@@ -43,11 +43,10 @@ if (empty($title) || $portions <= 0 || empty($pickup_location) || empty($pickup_
 // Server-side validation pickup_time
 $pickup_timestamp = strtotime($pickup_time);
 $now_timestamp = time();
-$max_timestamp = strtotime('+48 hours');
-if (!$pickup_timestamp || $pickup_timestamp < ($now_timestamp - 300) || $pickup_timestamp > $max_timestamp) {
+if (!$pickup_timestamp || $pickup_timestamp < $now_timestamp) {
     echo json_encode([
         'success' => false,
-        'error' => 'Η ώρα παραλαβής πρέπει να είναι μελλοντική και εντός των επόμενων 48 ωρών.'
+        'error' => 'Η ώρα παραλαβής πρέπει να είναι μελλοντική.'
     ]);
     exit;
 }

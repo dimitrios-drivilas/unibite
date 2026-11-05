@@ -2,8 +2,8 @@
 // Admin/api/get_leaderboard.php
 require_once '../../config/db.php';
 
-$donorStmt = $pdo->query("SELECT u.username, SUM(o.portions) as total_portions_offered, COUNT(o.id) as offer_count 
-    FROM users u JOIN offers o ON u.id = o.cook_id 
+$donorStmt = $pdo->query("SELECT u.username, COALESCE(SUM(o.portions_at_creation), 0) as total_portions_offered, COUNT(o.id) as offer_count
+    FROM users u JOIN offers o ON u.id = o.cook_id
     WHERE JSON_CONTAINS(u.roles, '\"cook\"') GROUP BY u.id ORDER BY total_portions_offered DESC LIMIT 5");
 $topDonors = $donorStmt->fetchAll();
 

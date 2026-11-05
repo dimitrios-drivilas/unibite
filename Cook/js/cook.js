@@ -16,6 +16,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (editForm) {
         editForm.addEventListener('submit', handleEditOffer);
     }
+
+    // Initialize allergens checkboxes
+    populateAllergens('allergens-container');
+    populateAllergens('edit-allergens-container');
+
+    // Setup auto-fill for pickup location coordinates
+    setupPickupLocationAutofill('pickup_location', 'coordinates');
+    setupPickupLocationAutofill('edit-pickup_location', 'edit-coordinates');
 });
 
 function setupPickupTimeLimits() {
@@ -162,52 +170,55 @@ async function loadMyOffers() {
             return;
         }
 
-        if (result.offers.length === 0) {
+        // Show all offers except cancelled and expired ones
+        const visibleOffers = (result.offers || []).filter(o => o.status !== 'cancelled' && o.status !== 'expired');
+
+        if (visibleOffers.length === 0) {
             container.innerHTML = '<p style="color: var(--text-muted);">Δεν έχετε δημιουργήσει καμία αγγελία ακόμα.</p>';
             return;
         }
 
-    container.innerHTML = result.offers.map(offer => `
-        <div class="offer-card" id="offer-${offer.id}">
-            ${offer.photo ? '<img src="' + escapeHtml(offer.photo.replace(/^Cook\//, '')) + '" alt="" style="width:100%; max-height:200px; object-fit:cover; border-radius:8px; margin-bottom:0.5rem;">' : ''}
-            <div class="offer-header">
-                <h3>${escapeHtml(offer.title)}</h3>
-                <span class="badge badge-${offer.status}">${translateStatus(offer.status)}</span>
-            </div>
-            <p>${escapeHtml(offer.description)}</p>
-            ${offer.allergens ? '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.5rem 0;"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : ''}
-            <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
-                🥣 Μερίδες: <strong>${offer.portions}</strong> | 📍 Σημείο: <strong>${escapeHtml(offer.pickup_location)}</strong> | ⏰ ${offer.pickup_time}
-            </p>
-            <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                <button class="btn btn-outline" onclick="openEditModal(${offer.id})">Επεξεργασία</button>
-                <button class="btn btn-outline" onclick="deleteOffer(${offer.id})">Διαγραφή</button>
-            </div>
-            
-            <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--secondary-color);">Αιτήματα Φοιτητών (${offer.requests.length})</h4>
-                ${offer.requests.length === 0 ? '<p style="font-size: 0.85rem; color: var(--text-muted);">Κανένα αίτημα ακόμα.</p>' : 
-                    offer.requests.map(req => `
-                        <div class="request-item">
-                            <div>
-                                <strong>${escapeHtml(req.consumer_name)}</strong> 
-                                <span style="font-size: 0.8rem; color: var(--text-muted);">[${req.status}]</span>
+        container.innerHTML = visibleOffers.map(offer => `
+            <div class="offer-card" id="offer-${offer.id}">
+                ${offer.photo ? '<img src="' + escapeHtml(offer.photo.replace(/^Cook\//, '')) + '" alt="" style="width:100%; max-height:200px; object-fit:cover; border-radius:8px; margin-bottom:0.5rem;">' : ''}
+                <div class="offer-header">
+                    <h3>${escapeHtml(offer.title)}</h3>
+                    <span class="badge badge-${offer.status}">${translateStatus(offer.status)}</span>
+                </div>
+                <p>${escapeHtml(offer.description)}</p>
+                ${offer.allergens ? '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.5rem 0;"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : ''}
+                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
+                    🥣 Μερίδες: <strong>${offer.portions}</strong> | 📍 Σημείο: <strong>${escapeHtml(offer.pickup_location)}</strong> | ⏰ ${offer.pickup_time}
+                </p>
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button class="btn btn-outline" onclick="openEditModal(${offer.id})">Επεξεργασία</button>
+                    <button class="btn btn-outline" onclick="deleteOffer(${offer.id})">Διαγραφή</button>
+                </div>
+                
+                <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                    <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--secondary-color);">Αιτήματα Φοιτητών (${offer.requests.length})</h4>
+                    ${offer.requests.length === 0 ? '<p style="font-size: 0.85rem; color: var(--text-muted);">Κανένα αίτημα ακόμα.</p>' : 
+                        offer.requests.map(req => `
+                            <div class="request-item">
+                                <div>
+                                    <strong>${escapeHtml(req.consumer_name)}</strong> 
+                                    <span style="font-size: 0.8rem; color: var(--text-muted);">[${req.status}]</span>
+                                </div>
+                                <div style="display: flex; gap: 0.3rem;">
+                                    ${req.status === 'pending' ? `
+                                        <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'approve')">Έγκριση</button>
+                                        <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'reject')">Απόρριψη</button>
+                                    ` : ''}
+                                    ${req.status === 'approved' ? `
+                                        <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; background-color: var(--success-color);" onclick="handleRequest(${req.id}, 'delivered')">Παραδόθηκε</button>
+                                        <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'absent')">Απών</button>
+                                    ` : ''}
+                                </div>
                             </div>
-                            <div style="display: flex; gap: 0.3rem;">
-                                ${req.status === 'pending' ? `
-                                    <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'approve')">Έγκριση</button>
-                                    <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'reject')">Απόρριψη</button>
-                                ` : ''}
-                                ${req.status === 'approved' ? `
-                                    <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; background-color: var(--success-color);" onclick="handleRequest(${req.id}, 'delivered')">Παραδόθηκε</button>
-                                    <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'absent')">Απών</button>
-                                ` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
+                        `).join('')}
+                </div>
             </div>
-        </div>
-    `).join('');
+        `).join('');
     } catch (error) {
         console.error('loadMyOffers error:', error);
         container.innerHTML = '<p style="color: var(--danger-color);">Σφάλμα σύνδεσης. Ελέγξτε αν είναι συνδεδεμένοι ως μάγειρας.</p>';
@@ -220,6 +231,11 @@ async function handleCreateOffer(e) {
     const form = e.target;
     const formData = new FormData(form);
 
+    // Collect allergens from checkboxes (name="allergens" without [] sends only last value in PHP)
+    const allergenCheckboxes = document.querySelectorAll('#allergens-container input[name="allergens"]:checked');
+    const allergensArray = Array.from(allergenCheckboxes).map(cb => cb.value);
+    formData.set('allergens', allergensArray.join(', '));
+
     // Add lat/lng from selected option
     const pickupSelect = document.getElementById('pickup_location');
     const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
@@ -228,17 +244,10 @@ async function handleCreateOffer(e) {
         formData.set('longitude', selectedOption.dataset.lng);
     }
 
-    // Client-side validation for pickup_time
+    // Only validate that pickup_time is provided (server will validate future date)
     const pickupTime = document.getElementById('pickup_time').value;
     if (!pickupTime) {
         UniBiteAuth.showToast('Η ώρα παραλαβής είναι υποχρεωτική.', 'error');
-        return;
-    }
-    const now = new Date();
-    const selectedTime = new Date(pickupTime);
-    const maxTime = new Date(now.getTime() + (48 * 60 * 60 * 1000));
-    if (selectedTime < now || selectedTime > maxTime) {
-        UniBiteAuth.showToast('Η ώρα παραλαβής πρέπει να είναι μελλοντική και εντός 48 ωρών.', 'error');
         return;
     }
 
@@ -261,6 +270,7 @@ async function handleCreateOffer(e) {
             form.reset();
             document.getElementById('coordinates').value = '';
             loadMyOffers();
+            loadCookStats();
         } else {
             UniBiteAuth.showToast(result.error || 'Σφάλμα δημιουργίας.', 'error');
         }
@@ -310,7 +320,7 @@ function openEditModal(offerId) {
                 const previewDiv = document.getElementById('edit-photo-preview');
                 const previewImg = document.getElementById('edit-photo-img');
                 if (offer.photo) {
-                    previewImg.src = offer.photo.replace(/^Cook\//, '');
+                    previewImg.src = offer.photo.replace('Cook/', '');
                     previewDiv.style.display = 'block';
                 } else {
                     previewDiv.style.display = 'none';
@@ -399,6 +409,7 @@ async function deleteOffer(offerId) {
     if (result.success) {
         UniBiteAuth.showToast(result.message, 'success');
         loadMyOffers();
+        loadCookStats();
     } else {
         UniBiteAuth.showToast(result.error || 'Σφάλμα διαγραφής.', 'error');
     }
@@ -426,13 +437,16 @@ function translateStatus(status) {
 }
 
 function escapeHtml(str) {
-    return str.replace(/[&<>'"]/g, function(tag) {
-        if (tag === '&') return '&';
-        if (tag === '<') return '<';
-        if (tag === '>') return '>';
-        if (tag === "'") return '&apos;';
-        if (tag === '"') return '"';
-        return tag;
+    if (str === null || str === undefined) return '';
+    return String(str).replace(/[&<>"']/g, function(tag) {
+        const chars = {
+            '&': '&',
+            '<': '<',
+            '>': '>',
+            '"': '"',
+            "'": "'"
+        };
+        return chars[tag] || tag;
     });
 }
 
@@ -479,7 +493,7 @@ function setupPickupLocationAutofill(selectId, coordinatesId) {
     const select = document.getElementById(selectId);
     const coordinatesInput = document.getElementById(coordinatesId);
     if (!select || !coordinatesInput) return;
-   
+  
     select.addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
         if (selectedOption && selectedOption.dataset.lat && selectedOption.dataset.lng) {
@@ -494,7 +508,7 @@ function setupPickupLocationAutofill(selectId, coordinatesId) {
 function parsePickupLocationForEdit(location) {
     const editSelect = document.getElementById('edit-pickup_location');
     if (!editSelect || !location) return;
-   
+  
     // Try to match by value (location ID)
     for (let option of editSelect.options) {
         if (option.value === location) {
@@ -504,7 +518,7 @@ function parsePickupLocationForEdit(location) {
             return;
         }
     }
-   
+  
     // Fallback: try to match by text content (legacy format)
     const legacyMap = {
         'Φοιτητική Εστία Α': 'fep-building-a',
@@ -532,7 +546,7 @@ function parsePickupLocationForEdit(location) {
         'Φοιτητική Λέσχη': 'fep-canteen',
         'Κουκούλι': 'koukouli-dormitory'
     };
-   
+  
     for (const [key, value] of Object.entries(legacyMap)) {
         if (location.includes(key)) {
             editSelect.value = value;
@@ -543,11 +557,4 @@ function parsePickupLocationForEdit(location) {
 }
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', () => {
-    populateAllergens('allergens-container');
-    populateAllergens('edit-allergens-container');
-   
-    // Setup auto-fill for both create and edit forms
-    setupPickupLocationAutofill('pickup_location', 'coordinates');
-    setupPickupLocationAutofill('edit-pickup_location', 'edit-coordinates');
-});
+// (DOMContentLoaded listener is at the top of the file)

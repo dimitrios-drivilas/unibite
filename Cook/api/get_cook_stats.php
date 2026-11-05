@@ -28,8 +28,13 @@ try {
     $stmt->execute([$cook_id]);
     $totalOffers = $stmt->fetchColumn();
 
-    // Total portions offered (portions_at_creation sum)
-    $stmt = $pdo->prepare("SELECT COALESCE(SUM(portions_at_creation), 0) as total FROM offers WHERE cook_id = ?");
+    // Total portions offered: count only delivered requests (portions actually delivered)
+    $stmt = $pdo->prepare("
+        SELECT COUNT(r.id) as total
+        FROM requests r
+        JOIN offers o ON r.offer_id = o.id
+        WHERE o.cook_id = ? AND r.status = 'delivered'
+    ");
     $stmt->execute([$cook_id]);
     $totalPortions = $stmt->fetchColumn();
 
