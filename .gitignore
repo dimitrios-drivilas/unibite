@@ -3,3 +3,4 @@ cookies*.txt
 **/.DS_Store
 init_data.php
 config/db.php
+debug_status.php

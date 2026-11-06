@@ -296,7 +296,13 @@ function openEditModal(offerId) {
                 document.getElementById('edit-coordinates').value = offer.latitude + ', ' + offer.longitude;
                 if (offer.pickup_time) {
                     const cleanTime = offer.pickup_time.replace(' ', 'T').slice(0, 16);
-                    document.getElementById('edit-pickup_time').value = cleanTime;
+                    const editTimeInput = document.getElementById('edit-pickup_time');
+                    editTimeInput.value = cleanTime;
+                    // Set min to the original pickup_time so the current value is always valid
+                    // This prevents HTML5 validation errors when editing offers with past pickup times
+                    editTimeInput.min = cleanTime;
+                    // Store original pickup_time for edit validation
+                    editTimeInput.dataset.originalTime = cleanTime;
                 }
                 document.getElementById('edit-status').value = offer.status;
                 
@@ -361,16 +367,26 @@ async function handleEditOffer(e) {
 
     // Client-side validation for pickup_time
     const pickupTime = document.getElementById('edit-pickup_time').value;
+    const editTimeInput = document.getElementById('edit-pickup_time');
+    const originalTime = editTimeInput.dataset.originalTime;
+    
     if (!pickupTime) {
         UniBiteAuth.showToast('Η ώρα παραλαβής είναι υποχρεωτική.', 'error');
         return;
     }
-    const now = new Date();
-    const selectedTime = new Date(pickupTime);
-    const maxTime = new Date(now.getTime() + (48 * 60 * 60 * 1000));
-    if (selectedTime < now || selectedTime > maxTime) {
-        UniBiteAuth.showToast('Η ώρα παραλαβής πρέπει να είναι μελλοντική και εντός 48 ωρών.', 'error');
-        return;
+    // Normalize both times for comparison (datetime-local is YYYY-MM-DDTHH:MM, DB is YYYY-MM-DD HH:MM:SS)
+    const normalizeForCompare = (dt) => dt.replace(' ', 'T').slice(0, 16);
+    const isTimeChanged = normalizeForCompare(pickupTime) !== normalizeForCompare(originalTime);
+    
+    // Only validate future/48h if the time was CHANGED from original
+    if (isTimeChanged) {
+        const now = new Date();
+        const selectedTime = new Date(pickupTime);
+        const maxTime = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+        if (selectedTime < now || selectedTime > maxTime) {
+            UniBiteAuth.showToast('Η ώρα παραλαβής πρέπει να είναι μελλοντική και εντός 48 ωρών.', 'error');
+            return;
+        }
     }
 
     const submitBtn = form.querySelector('button[type="submit"]');

@@ -287,6 +287,6 @@ $user = authGuard(['cook']);
         </div>
 
     <script src="../Shared/js/auth.js"></script>
-            <script src="js/cook.js"></script>
+        <script src="js/cook.js?v=<?= time() ?>"></script>
     </body>
     </html>

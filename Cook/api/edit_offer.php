@@ -42,14 +42,47 @@ if ($offer_id <= 0 || empty($title) || $portions <= 0 || empty($pickup_location)
     exit;
 }
 
-$pickup_timestamp = strtotime($pickup_time);
-$now_timestamp = time();
-$max_timestamp = strtotime('+48 hours');
-if (!$pickup_timestamp || $pickup_timestamp < ($now_timestamp - 300) || $pickup_timestamp > $max_timestamp) {
-    echo json_encode([
-        'success' => false,
-        'error' => 'Η ώρα παραλαβής πρέπει να είναι μελλοντική και εντός των επόμενων 48 ωρών.'
-    ]);
+// Get current offer to compare pickup_time
+$currentOfferStmt = $pdo->prepare("SELECT pickup_time, status FROM offers WHERE id = ? AND cook_id = ?");
+$currentOfferStmt->execute([$offer_id, $cook_id]);
+$currentOffer = $currentOfferStmt->fetch();
+
+if (!$currentOffer) {
+    echo json_encode(['success' => false, 'error' => 'Δεν βρέθηκε η αγγελία ή δεν έχετε δικαίωμα.']);
+    exit;
+}
+
+// Only validate pickup_time if it's being changed
+// Normalize both for comparison (form: YYYY-MM-DDTHH:MM, DB: YYYY-MM-DD HH:MM:SS)
+$normalizedFormTime = str_replace('T', ' ', $pickup_time);
+if (strlen($normalizedFormTime) === 16) {
+    $normalizedFormTime .= ':00';
+}
+$normalizedDbTime = substr($currentOffer['pickup_time'], 0, 19);
+
+if ($normalizedFormTime !== $normalizedDbTime) {
+    $pickup_timestamp = strtotime($pickup_time);
+    $now_timestamp = time();
+    $max_timestamp = strtotime('+48 hours');
+    if (!$pickup_timestamp || $pickup_timestamp < ($now_timestamp - 300) || $pickup_timestamp > $max_timestamp) {
+        echo json_encode([
+            'success' => false,
+            'error' => 'Η ώρα παραλαβής πρέπει να είναι μελλοντική και εντός των επόμενων 48 ωρών.'
+        ]);
+        exit;
+    }
+} else {
+    // If keeping the same pickup_time, just validate it's a valid datetime
+    $pickup_timestamp = strtotime($pickup_time);
+    if (!$pickup_timestamp) {
+        echo json_encode(['success' => false, 'error' => 'Μη έγκυρη ημερομηνία/ώρα παραλαβής.']);
+        exit;
+    }
+}
+
+// Ensure offer is still active/editable
+if ($currentOffer['status'] !== 'active' && $currentOffer['status'] !== 'inactive') {
+    echo json_encode(['success' => false, 'error' => 'Δεν μπορείτε να επεξεργαστείτε αγγελία που έχει ολοκληρωθεί ή ακυρωθεί.']);
     exit;
 }
 

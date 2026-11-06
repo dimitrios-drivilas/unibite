@@ -449,9 +449,9 @@ if ($isLoggedIn) {
                                                     if ($hours_left >= 24) {
                                                         $days = floor($hours_left / 24);
                                                         $hrs = $hours_left % 24;
-                                                        $timeStr = "{$days} ημέρα" . ($days > 1 ? 'ς' : '') . ($hrs > 0 ? " {$hrs} ώρες" : '');
+                                                        $timeStr = "{$days} " . ($days === 1 ? 'ημέρα' : 'ημέρες') . ($hrs > 0 ? " {$hrs} ώρες" : '');
                                                     } else {
-                                                        $timeStr = "{$hours_left} ώρα" . ($hours_left > 1 ? 'ς' : '');
+                                                        $timeStr = "{$hours_left} " . ($hours_left === 1 ? 'ώρα' : 'ώρες');
                                                     }
                                                 } else {
                                                     $timeStr = 'ήδη παρήλθε';
@@ -873,9 +873,9 @@ if ($isLoggedIn) {
                             if (hoursRemaining >= 24) {
                                 const days = Math.floor(hoursRemaining / 24);
                                 const hrs = hoursRemaining % 24;
-                                timeStr = `${days} ημέρα${days > 1 ? 'ς' : ''}${hrs > 0 ? ' ' + hrs + ' ώρες' : ''}`;
+                                timeStr = `${days} ${days === 1 ? 'ημέρα' : 'ημέρες'}${hrs > 0 ? ' ' + hrs + ' ώρες' : ''}`;
                             } else {
-                                timeStr = `${hoursRemaining} ώρα${hoursRemaining > 1 ? 'ς' : ''}`;
+                                timeStr = `${hoursRemaining} ${hoursRemaining === 1 ? 'ώρα' : 'ώρες'}`;
                             }
                         } else {
                             timeStr = 'ήδη παρήλθε';
