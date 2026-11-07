@@ -1,6 +1,8 @@
 <?php
 // config/db.php
 
+date_default_timezone_set('Europe/Athens');
+
 $host = '127.0.0.1';
 $db   = 'unibite_db';
 $user = 'root';
@@ -16,6 +18,8 @@ $options = [
 
 try {
     $pdo = new PDO($dsn, $user, $pass, $options);
+    // Set MySQL session timezone to match PHP
+    $pdo->exec("SET time_zone = '+02:00'");
 } catch (\PDOException $e) {
     if (php_sapi_name() !== 'cli') {
         header('Content-Type: application/json; charset=UTF-8');

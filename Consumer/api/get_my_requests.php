@@ -24,6 +24,7 @@ $stmt = $pdo->prepare("
         r.status,
         r.created_at,
         r.updated_at,
+        r.penalized,
         o.title,
         o.pickup_location,
         o.pickup_time,

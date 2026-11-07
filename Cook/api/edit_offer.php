@@ -36,10 +36,22 @@ $status = $_POST['status'] ?? 'active';
 $latitude = floatval($_POST['latitude'] ?? 38.2942);
 $longitude = floatval($_POST['longitude'] ?? 21.7887);
 
+// Terminal statuses that cannot be edited
+$terminalStatuses = ['completed', 'cancelled', 'expired'];
+
 // Validation
-if ($offer_id <= 0 || empty($title) || $portions <= 0 || empty($pickup_location) || empty($pickup_time)) {
+if ($offer_id <= 0 || empty($title) || $portions < 0 || empty($pickup_location) || empty($pickup_time)) {
     echo json_encode(['success' => false, 'error' => 'Συμπληρώστε όλα τα απαραίτητα πεδία σωστά.']);
     exit;
+}
+
+// Auto-sync status based on portions (only for non-terminal states)
+if (!in_array($status, $terminalStatuses)) {
+    if ($portions <= 0 && $status === 'active') {
+        $status = 'inactive';
+    } elseif ($portions > 0 && $status === 'inactive') {
+        $status = 'active';
+    }
 }
 
 // Get current offer to compare pickup_time
@@ -49,6 +61,13 @@ $currentOffer = $currentOfferStmt->fetch();
 
 if (!$currentOffer) {
     echo json_encode(['success' => false, 'error' => 'Δεν βρέθηκε η αγγελία ή δεν έχετε δικαίωμα.']);
+    exit;
+}
+
+// Check if offer is in a terminal state (cannot be edited)
+$terminalStatuses = ['completed', 'cancelled', 'expired'];
+if (in_array($currentOffer['status'], $terminalStatuses)) {
+    echo json_encode(['success' => false, 'error' => 'Η αγγελία βρίσκεται σε τερματική κατάσταση και δεν μπορεί να τροποποιηθεί.']);
     exit;
 }
 

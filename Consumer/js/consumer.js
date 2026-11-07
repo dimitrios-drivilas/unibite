@@ -240,7 +240,12 @@ function renderMyRequests(requests, container) {
         return;
     }
 
-    container.innerHTML = requests.map(req => `
+    container.innerHTML = requests.map(req => {
+        const isPenalized = req.penalized === 1 || req.penalized === '1';
+        const showRatingButton = req.status === 'delivered' && !Number(req.is_rated) && !isPenalized;
+        const showPenaltyMessage = req.status === 'delivered' && !Number(req.is_rated) && isPenalized;
+        
+        return `
         <div class="meal-card offer-card" style="border-left: 4px solid ${getRequestStatusColor(req.status)};">
             <div class="offer-header" style="display:flex; justify-content:space-between; align-items:center;">
                 <h3 style="margin:0;">${escapeHtml(req.title)}</h3>
@@ -250,10 +255,15 @@ function renderMyRequests(requests, container) {
                 📍 ${escapeHtml(formatLocationName(req.pickup_location))} | ⏰ ${formatDateTime(req.pickup_time)} | 👨‍🍳 ${escapeHtml(req.cook_name)}
             </p>
             <p style="font-size: 0.85rem; color: var(--text-muted);">Αιτήθηκε: ${formatDateTime(req.created_at)}</p>
-            ${req.status === 'delivered' && !Number(req.is_rated) ? `
+            ${showRatingButton ? `
                 <button class="btn btn-outline" style="margin-top: 0.5rem; width: 100%;" onclick="openRatingModal(${req.offer_id})">
                     ⭐ Αξιολόγηση Γεύματος
                 </button>
+            ` : ''}
+            ${showPenaltyMessage ? `
+                <div style="margin-top: 0.5rem; padding: 0.75rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; color: #991B1B; font-size: 0.85rem; text-align: center;">
+                    ❌ <strong>Εκπρόθεσμο (Έληξε η προθεσμία και επιβλήθηκε ποινή)</strong>
+                </div>
             ` : ''}
             ${req.status === 'pending' ? `
                 <button class="btn btn-danger" style="margin-top: 0.5rem; width: 100%;" onclick="cancelRequest(${req.id})">
@@ -262,7 +272,7 @@ function renderMyRequests(requests, container) {
             ` : ''}
             ${Number(req.is_rated) ? '<p style="margin-top: 0.5rem; font-size: 0.85rem; color: var(--success-color);">✅ Αξιολογημένο</p>' : ''}
         </div>
-    `).join('');
+    `}).join('');
 }
 
 async function makeRequest(offerId) {

@@ -28,10 +28,17 @@ if ($rating < 1 || $rating > 5) {
 }
 
 // 1. Check if delivered request exists
-$chk = $pdo->prepare("SELECT r.id FROM requests r WHERE r.offer_id = ? AND r.consumer_id = ? AND r.status = 'delivered'");
+$chk = $pdo->prepare("SELECT r.id, r.penalized FROM requests r WHERE r.offer_id = ? AND r.consumer_id = ? AND r.status = 'delivered'");
 $chk->execute([$offer_id, $consumer_id]);
-if (!$chk->fetch()) {
+$request = $chk->fetch();
+if (!$request) {
     echo json_encode(['success' => false, 'error' => 'Μπορείτε να αξιολογήσετε μόνο γεύματα που έχετε παραλάβει.']);
+    exit;
+}
+
+// Check if already penalized (48h passed without rating)
+if ($request['penalized'] == 1) {
+    echo json_encode(['success' => false, 'error' => 'Η προθεσμία αξιολόγησης έληξε και έχει επιβληθεί ποινή. Δεν μπορείτε πλέον να αξιολογήσετε αυτό το γεύμα.']);
     exit;
 }
 

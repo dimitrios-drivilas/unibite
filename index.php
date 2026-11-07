@@ -1,5 +1,8 @@
 <?php
 // index.php
+$silent_cron = true;
+require_once __DIR__ . '/cron/auto_expire.php';
+
 // Try to get current user without redirecting
 require_once __DIR__ . '/config/db.php';
 
@@ -94,6 +97,7 @@ if ($isLoggedIn) {
                 r.status as request_status,
                 r.created_at,
                 r.updated_at,
+                r.penalized,
                 o.id as offer_id,
                 o.title,
                 o.pickup_location,
@@ -444,6 +448,7 @@ if ($isLoggedIn) {
                                                 $deadline = $delivered_time + (48 * 3600);
                                                 $hours_left = max(0, round(($deadline - time()) / 3600));
                                                 $deadline_str = date('d/m/Y H:i', $deadline);
+                                                $is_penalized = isset($req['penalized']) && $req['penalized'] == 1;
                                                 $timeStr = '';
                                                 if ($hours_left > 0) {
                                                     if ($hours_left >= 24) {
@@ -475,8 +480,12 @@ if ($isLoggedIn) {
                                                     </div>
                                                     <div style="color: #78350F; font-size: 0.9rem; line-height: 1.5;">
                                                         <strong><?= htmlspecialchars($req['title']) ?></strong> — Μάγειρας: <?= htmlspecialchars($req['cook_name']) ?><br>
-                                                        Απομένουν <strong><?= $timeStr ?></strong> (έως <?= $deadline_str ?>).
-                                                        <br>Αν δεν αξιολογήσετε εντός 48 ωρών από την παραλαβή, θα σας αφαιρεθεί <strong>1 credit ποινής (-1 πόντους)</strong>.
+                                                        <?php if ($is_penalized): ?>
+                                                            ❌ <strong>Έληξε η προθεσμία αξιολόγησης (<?= $deadline_str ?>) — Σας αφαιρέθηκε 1 πόντος ποινής.</strong>
+                                                        <?php else: ?>
+                                                            Απομένουν <strong><?= $timeStr ?></strong> (έως <?= $deadline_str ?>).
+                                                            <br>Αν δεν αξιολογήσετε εντός 48 ωρών από την παραλαβή, θα σας αφαιρεθεί <strong>1 credit ποινής (-1 πόντους)</strong>.
+                                                        <?php endif; ?>
                                                     </div>
                                                 </div>
                                             </div>
@@ -863,11 +872,19 @@ if ($isLoggedIn) {
                     pendingRatings.forEach(req => {
                         const hoursSinceDelivery = parseInt(req.hours_since_delivery) || 0;
                         const hoursRemaining = 48 - hoursSinceDelivery;
-                        const deadline = new Date(new Date(req.updated_at).getTime() + 48 * 60 * 60 * 1000);
+                        // Parse updated_at as UTC to avoid timezone issues (DB stores in UTC+2, JS parses as local)
+                        const parseUTC = (dt) => {
+                            const [datePart, timePart] = dt.split(' ');
+                            const [y, m, d] = datePart.split('-').map(Number);
+                            const [h, mi, s] = timePart.split(':').map(Number);
+                            return Date.UTC(y, m - 1, d, h, mi, s);
+                        };
+                        const deadline = new Date(parseUTC(req.updated_at) + 48 * 60 * 60 * 1000);
                         const deadlineStr = deadline.toLocaleString('el-GR', {
                             day: '2-digit', month: '2-digit', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit'
+                            hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Athens'
                         });
+                        const isPenalized = req.penalized === 1 || req.penalized === '1';
                         let timeStr = '';
                         if (hoursRemaining > 0) {
                             if (hoursRemaining >= 24) {
@@ -900,8 +917,10 @@ if ($isLoggedIn) {
                                     </div>
                                     <div style="color: #78350F; font-size: 0.9rem; line-height: 1.5;">
                                         <strong>${escapeHtml(req.title)}</strong> — Μάγειρας: ${escapeHtml(req.cook_name)}<br>
-                                        Απομένουν <strong>${timeStr}</strong> (έως ${deadlineStr}).
-                                        <br>Αν δεν αξιολογήσετε εντός 48 ωρών από την παραλαβή, θα σας αφαιρεθεί <strong>1 credit ποινής (-1 πόντους)</strong>.
+                                        ${isPenalized
+                                            ? `❌ <strong>Έληξε η προθεσμία αξιολόγησης (${deadlineStr}) — Σας αφαιρέθηκε 1 πόντος ποινής.</strong>`
+                                            : `Απομένουν <strong>${timeStr}</strong> (έως ${deadlineStr}).<br>Αν δεν αξιολογήσετε εντός 48 ωρών από την παραλαβή, θα σας αφαιρεθεί <strong>1 credit ποινής (-1 πόντους)</strong>.`
+                                        }
                                     </div>
                                 </div>
                             </div>

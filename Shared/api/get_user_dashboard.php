@@ -1,6 +1,9 @@
 <?php
 // Shared/api/get_user_dashboard.php
 // Returns dashboard stats for any authenticated user (cook, consumer, or both)
+$silent_cron = true;
+require_once __DIR__ . '/../../cron/auto_expire.php';
+
 require_once '../../config/db.php';
 
 if (session_status() === PHP_SESSION_NONE) {

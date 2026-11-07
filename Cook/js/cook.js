@@ -157,6 +157,9 @@ function formatDate(dateStr) {
     return date.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// Terminal states that cannot be edited once set
+const TERMINAL_STATUSES = ['completed', 'cancelled', 'expired'];
+
 async function loadMyOffers() {
     const container = document.getElementById('offers-list');
     if (!container) return;
@@ -179,21 +182,21 @@ async function loadMyOffers() {
         }
 
         container.innerHTML = visibleOffers.map(offer => `
-            <div class="offer-card" id="offer-${offer.id}">
-                ${offer.photo ? '<img src="' + escapeHtml(offer.photo.replace(/^Cook\//, '')) + '" alt="" style="width:100%; max-height:200px; object-fit:cover; border-radius:8px; margin-bottom:0.5rem;">' : ''}
-                <div class="offer-header">
-                    <h3>${escapeHtml(offer.title)}</h3>
-                    <span class="badge badge-${offer.status}">${translateStatus(offer.status)}</span>
-                </div>
-                <p>${escapeHtml(offer.description)}</p>
-                ${offer.allergens ? '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.5rem 0;"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : ''}
-                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
-                    🥣 Μερίδες: <strong>${offer.portions}</strong> | 📍 Σημείο: <strong>${escapeHtml(offer.pickup_location)}</strong> | ⏰ ${offer.pickup_time}
-                </p>
-                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                    <button class="btn btn-outline" onclick="openEditModal(${offer.id})">Επεξεργασία</button>
-                    <button class="btn btn-outline" onclick="deleteOffer(${offer.id})">Διαγραφή</button>
-                </div>
+                    <div class="offer-card" id="offer-${offer.id}">
+                        ${offer.photo ? '<img src="' + escapeHtml(offer.photo.replace('Cook/', '')) + '" alt="" style="width:100%; max-height:200px; object-fit:cover; border-radius:8px; margin-bottom:0.5rem;">' : ''}
+                        <div class="offer-header">
+                            <h3>${escapeHtml(offer.title)}</h3>
+                            <span class="badge badge-${offer.status}">${translateStatus(offer.status)}</span>
+                        </div>
+                        <p>${escapeHtml(offer.description)}</p>
+                        ${offer.allergens ? '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.5rem 0;"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : ''}
+                        <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
+                            🥣 Μερίδες: <strong>${offer.portions}</strong> | 📍 Σημείο: <strong>${escapeHtml(offer.pickup_location)}</strong> | ⏰ ${offer.pickup_time}
+                        </p>
+                        <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                            ${!TERMINAL_STATUSES.includes(offer.status) ? `<button class="btn btn-outline" onclick="openEditModal(${offer.id})">Επεξεργασία</button>` : ''}
+                            <button class="btn btn-outline" onclick="deleteOffer(${offer.id})">Διαγραφή</button>
+                        </div>
                 
                 <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
                     <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--secondary-color);">Αιτήματα Φοιτητών (${offer.requests.length})</h4>
@@ -304,9 +307,36 @@ function openEditModal(offerId) {
                     // Store original pickup_time for edit validation
                     editTimeInput.dataset.originalTime = cleanTime;
                 }
-                document.getElementById('edit-status').value = offer.status;
-                
-                // Populate allergens checkboxes in edit modal
+                                document.getElementById('edit-status').value = offer.status;
+
+                                // Show/hide warning banner for terminal statuses in edit modal
+                                const statusSelect = document.getElementById('edit-status');
+                                const existingWarning = document.getElementById('terminal-status-warning');
+                                if (existingWarning) existingWarning.remove();
+
+                                function updateTerminalWarning() {
+                                    const selectedStatus = statusSelect.value;
+                                    if (TERMINAL_STATUSES.includes(selectedStatus)) {
+                                        if (!document.getElementById('terminal-status-warning')) {
+                                            const warningDiv = document.createElement('div');
+                                            warningDiv.id = 'terminal-status-warning';
+                                            warningDiv.style.cssText = 'margin-top: 0.75rem; padding: 0.75rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; color: #991B1B; font-size: 0.875rem;';
+                                            warningDiv.innerHTML = '⚠️ <strong>Προσοχή:</strong> Αυτή η κατάσταση είναι τερματική. Αν αποθηκεύσετε, δεν θα μπορείτε να επαναφέρετε ή να επεξεργαστείτε ξανά την αγγελία.';
+                                            statusSelect.parentNode.insertBefore(warningDiv, statusSelect.nextSibling);
+                                        }
+                                    } else {
+                                        const existingWarning = document.getElementById('terminal-status-warning');
+                                        if (existingWarning) existingWarning.remove();
+                                    }
+                                }
+
+                                // Initial check
+                                updateTerminalWarning();
+
+                                // Listen for status changes
+                                statusSelect.addEventListener('change', updateTerminalWarning);
+
+                                // Populate allergens checkboxes in edit modal
                 const existingAllergens = offer.allergens ? offer.allergens.split(',').map(a => a.trim()) : [];
                 populateAllergens('edit-allergens-container', existingAllergens);
                 
@@ -391,6 +421,19 @@ async function handleEditOffer(e) {
 
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
+
+    // Check if status is being changed to a terminal state
+    const newStatus = formData.get('status');
+    const currentStatus = document.getElementById('edit-status').value; // This is the original value before form submission
+    if (TERMINAL_STATUSES.includes(newStatus) && newStatus !== currentStatus) {
+        const confirmed = confirm('⚠️ Προσοχή: Η αλλαγή της κατάστασης σε «Ολοκληρωμένη» ή «Ακυρωμένη» είναι οριστική (τερματική κατάσταση). Μετά την αποθήκευση ΔΕΝ θα μπορείτε να επεξεργαστείτε ξανά την αγγελία ή να την επαναφέρετε σε ενεργή. Θέλετε σίγουρα να συνεχίσετε;');
+        if (!confirmed) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+            return;
+        }
+    }
+
     submitBtn.disabled = true;
     submitBtn.textContent = 'Αποθήκευση...';
 
