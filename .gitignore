@@ -5,3 +5,4 @@ init_data.php
 config/db.php
 debug_status.php
 my_old_data.sql
+cookies*.txt
