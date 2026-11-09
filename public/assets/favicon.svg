@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bunTop" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#F5A623;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E8911A;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="bunBottom" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#D47A1A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#C46A1A;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="meat" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B4513;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5D2E0C;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="cheese" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#FFD700;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E6C300;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="lettuce" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2ECC71;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#27AE60;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Shadow -->
+  <ellipse cx="50" cy="92" rx="30" ry="4" fill="#000000" opacity="0.2"/>
+  
+  <!-- Bottom bun -->
+  <path d="M25 68 Q25 58 50 58 Q75 58 75 68 Q75 78 50 78 Q25 78 25 68 Z" fill="url(#bunBottom)"/>
+  <path d="M30 68 Q30 60 50 60 Q70 60 70 68" stroke="#C46A1A" stroke-width="1.5" fill="none" opacity="0.3"/>
+  
+  <!-- Lettuce -->
+  <path d="M22 68 Q30 62 50 60 Q70 62 78 68 Q72 72 50 70 Q28 72 22 68 Z" fill="url(#lettuce)"/>
+  <path d="M25 68 Q35 60 50 56 Q65 60 75 68" stroke="#27AE60" stroke-width="0.5" fill="none" opacity="0.4"/>
+  
+  <!-- Cheese -->
+  <path d="M20 55 Q35 48 50 46 Q65 48 80 55 Q75 60 50 58 Q25 60 20 55 Z" fill="url(#cheese)"/>
+  <path d="M25 55 Q35 50 50 47 Q65 50 75 55" stroke="#E6C300" stroke-width="0.5" fill="none" opacity="0.4"/>
+  
+  <!-- Meat patty -->
+  <path d="M22 52 Q28 44 50 42 Q72 44 78 52 Q78 58 50 56 Q22 58 22 52 Z" fill="url(#meat)"/>
+  <path d="M28 50 Q35 46 50 45 Q65 46 72 50" stroke="#5D2E0C" stroke-width="0.5" fill="none" opacity="0.3"/>
+  
+  <!-- Top bun -->
+  <path d="M20 44 Q20 30 50 25 Q80 30 80 44 Q80 56 50 50 Q20 56 20 44 Z" fill="url(#bunTop)"/>
+  <path d="M25 44 Q30 32 50 27 Q70 32 75 44" stroke="#E8911A" stroke-width="1.5" fill="none" opacity="0.3"/>
+  
+  <!-- Sesame seeds on top bun -->
+  <circle cx="35" cy="35" r="1.5" fill="#FFF8DC" opacity="0.9"/>
+  <circle cx="55" cy="30" r="1.5" fill="#FFF8DC" opacity="0.9"/>
+  <circle cx="68" cy="37" r="1.5" fill="#FFF8DC" opacity="0.9"/>
+  <circle cx="42" cy="33" r="1.5" fill="#FFF8DC" opacity="0.9"/>
+  <circle cx="58" cy="35" r="1.5" fill="#FFF8DC" opacity="0.9"/>
+  <circle cx="30" cy="38" r="1.5" fill="#FFF8DC" opacity="0.9"/>
+</svg>

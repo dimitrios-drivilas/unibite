@@ -53,25 +53,19 @@ function setupTabs() {
     tabBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             const tab = btn.dataset.tab;
-            
-            // Update button states
+
+            // Update button states - just toggle classes, let CSS handle styling
             document.querySelectorAll('.tab-btn').forEach(b => {
                 b.classList.remove('active');
-                b.style.background = 'var(--card-bg)';
-                b.style.color = 'var(--text-color)';
-                b.style.border = '1px solid var(--border-color)';
             });
             btn.classList.add('active');
-            btn.style.background = 'var(--primary-color)';
-            btn.style.color = 'white';
-            btn.style.border = 'none';
-            
+
             // Show/hide panels
             document.querySelectorAll('.tab-panel').forEach(panel => {
                 panel.style.display = 'none';
             });
             document.getElementById('tab-' + tab).style.display = 'block';
-            
+
             // Load stats when switching to stats tab
             if (tab === 'stats') {
                 loadCookStats();
@@ -96,59 +90,112 @@ async function loadCookStats() {
     console.log('DEBUG ratingVal:', ratingVal);
     document.getElementById('stat-avg-rating').textContent = ratingVal;
 
+    // New stats
+    document.getElementById('stat-points-from-offers').textContent = result.stats.points_from_offers > 0 ? '+' + result.stats.points_from_offers : '0';
+
+    const penaltiesEl = document.getElementById('stat-penalties-received');
+    const penalties = result.stats.penalties_received;
+    penaltiesEl.textContent = penalties;
+    if (penalties > 0) {
+        penaltiesEl.style.color = 'var(--dp-color-danger)';
+    } else {
+        penaltiesEl.style.color = 'var(--dp-color-ink)';
+    }
+
     const container = document.getElementById('stats-offers-list');
     if (!container) return;
-    
+
     if (result.offers.length === 0) {
-        container.innerHTML = '<p style="color: var(--text-muted);">Δεν έχετε δημιουργήσει καμία αγγελία ακόμα.</p>';
+        container.innerHTML = '<p style="color: var(--dp-color-ink-secondary);">Δεν έχετε δημιουργήσει καμία αγγελία ακόμα.</p>';
         return;
     }
 
-    container.innerHTML = result.offers.map(offer => `
-        <div class="offer-card" style="margin-bottom: 1rem; border-left: 4px solid ${getStatusColor(offer.status)};">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
-                <h4 style="color: var(--secondary-color); margin: 0;">${escapeHtml(offer.title)}</h4>
-                <span class="badge badge-${offer.status}">${translateStatus(offer.status)}</span>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);">
-                <div>🥣 Μερίδες: <strong>${offer.portions}</strong></div>
-                <div>📅 Δημιουργήθηκε: <strong>${formatDate(offer.created_at)}</strong></div>
-                <div>📥 Αιτήματα: <strong>${offer.total_requests}</strong></div>
-                <div>✅ Παραδόθηκαν: <strong>${offer.delivered_requests}</strong></div>
-            </div>
+    container.innerHTML = result.offers.map(offer => {
+        const photoHtml = offer.photo ? '<img src="' + escapeHtml(offer.photo.replace('Cook/', '')) + '" alt="" style="width:100%; height:120px; object-fit:cover; border-radius:8px; border: var(--dp-border-hairline) solid var(--dp-color-rule);">' : '';
 
-            ${(offer.delivered_requests > 0 && offer.rating_count > 0) ? `
-                <div style="border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
-                        <span style="font-size: 1.5rem; color: var(--warning-color);">⭐ ${offer.avg_rating.toFixed(1)}</span>
-                        <span style="color: var(--text-muted);">(${offer.rating_count} αξιολογήσεις)</span>
-                    </div>
-                    <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-                        ${offer.ratings.map(r => `
-                            <div style="background: var(--card-bg); padding: 0.75rem; border-radius: var(--radius); border: 1px solid var(--border-color);">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-                                    <span style="font-weight: 600;">${'⭐'.repeat(r.rating)}</span>
-                                    <small style="color: var(--text-muted);">Πόντοι: ${r.rating >= 4 ? '+2' : '+1'}</small>
-                                </div>
-                                ${r.comment ? '<p style="margin: 0; font-style: italic; color: var(--text-muted);">"' + escapeHtml(r.comment) + '"</p>' : ''}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : '<p style="color: var(--text-muted); font-size: 0.9rem;">Δεν υπάρχουν ακόμη αξιολογήσεις (διαθέσιμες μετά την παραλαβή).</p>'}
-        </div>
-    `).join('');
+        const requestsHtml = (offer.ratings || []).map(req => {
+            const hasRating = req.rating !== null && req.rating !== undefined && req.rating !== '';
+            const isPenalized = req.penalized == 1 || req.penalized === '1';
+            const isDelivered = req.status === 'delivered';
+
+            let ratingHtml = '';
+            if (hasRating) {
+                const starStr = '⭐'.repeat(parseInt(req.rating));
+                const pointsStr = req.rating >= 4 ? '+2' : '+1';
+                const commentHtml = req.comment ? '<span class="rating-comment">"' + escapeHtml(req.comment) + '"</span>' : '';
+                const ratingDate = req.rating_created_at ? req.rating_created_at.split('T')[0] : '';
+                ratingHtml = '<div class="request-rating">' +
+                    '<span class="rating-stars">' + starStr + '</span>' +
+                    '<span class="rating-points">Πόντοι: ' + pointsStr + '</span>' +
+                    '<span class="rating-consumer">από ' + escapeHtml(req.consumer_name) + '</span>' +
+                    commentHtml +
+                    (ratingDate ? '<span class="rating-date">' + ratingDate + '</span>' : '') +
+                '</div>';
+            } else if (isDelivered && !isPenalized) {
+                ratingHtml = '<div class="request-rating"><span class="rating-pending">(Εκκρεμεί αξιολόγηση)</span></div>';
+            } else if (isDelivered && isPenalized) {
+                ratingHtml = '<div class="request-rating"><span class="rating-penalized">(Έληξε η προθεσμία αξιολόγησης)</span></div>';
+            }
+
+            const actionsHtml = req.status === 'pending'
+                ? '<button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'approve\')">Έγκριση</button>' +
+                  '<button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'reject\')">Απόρριψη</button>'
+                : (req.status === 'approved'
+                    ? '<button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem; background-color: var(--dp-color-success);" onclick="handleRequest(' + req.id + ', \'delivered\')">Παραδόθηκε</button>' +
+                      '<button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'absent\')">Απών</button>'
+                    : '');
+
+            return '<div class="request-item">' +
+                '<div class="request-item-header">' +
+                    '<span class="consumer-name">' + escapeHtml(req.consumer_name) + '</span>' +
+                    '<span class="request-status">' + req.status + '</span>' +
+                '</div>' +
+                '<div class="request-actions">' + actionsHtml + '</div>' +
+                ratingHtml +
+            '</div>';
+        }).join('');
+
+        return '<div class="offer-card" id="offer-' + offer.id + '">' +
+            '<div class="offer-left">' +
+                photoHtml +
+                '<div class="offer-header">' +
+                    '<div class="offer-header-left">' +
+                        '<h3>' + escapeHtml(offer.title) + '</h3>' +
+                        '<span class="badge badge-' + offer.status + '">' + translateStatus(offer.status) + '</span>' +
+                    '</div>' +
+                    '<div class="offer-actions">' +
+                        (!TERMINAL_STATUSES.includes(offer.status) ? '<button class="btn btn-outline" onclick="openEditModal(' + offer.id + ')">Επεξεργασία</button>' : '') +
+                        '<button class="btn btn-outline" onclick="deleteOffer(' + offer.id + ')">Διαγραφή</button>' +
+                    '</div>' +
+                '</div>' +
+                '<p>' + escapeHtml(offer.description) + '</p>' +
+                (offer.allergens ? '<p class="offer-allergens"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : '') +
+                '<p class="offer-meta">' +
+                    '<span><strong>🥣 Μερίδες:</strong> ' + offer.portions + '</span>' +
+                    '<span><strong>📍 Σημείο:</strong> ' + escapeHtml(offer.pickup_location) + '</span>' +
+                    '<span><strong>⏰</strong> ' + offer.pickup_time + '</span>' +
+                '</p>' +
+            '</div>' +
+            '<div class="offer-right">' +
+                '<div class="requests-section">' +
+                    '<h4>Αξιολογήσεις (' + (offer.rating_count || 0) + ')</h4>' +
+                    ((offer.ratings || []).length === 0
+                        ? '<p style="font-size: 0.85rem; color: var(--dp-color-ink-secondary);">Κανένα αξιολόγηση ακόμα.</p>'
+                        : '<div class="requests-list"><div class="requests-grid">' + requestsHtml + '</div></div>') +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
 }
 
 function getStatusColor(status) {
     switch(status) {
-        case 'active': return 'var(--success-color)';
-        case 'inactive': return 'var(--warning-color)';
-        case 'completed': return 'var(--primary-color)';
-        case 'cancelled': return 'var(--danger-color)';
-        case 'expired': return 'var(--text-muted)';
-        default: return 'var(--border-color)';
+        case 'active': return 'var(--dp-color-success)';
+        case 'inactive': return 'var(--dp-color-warning)';
+        case 'completed': return 'var(--dp-color-accent)';
+        case 'cancelled': return 'var(--dp-color-danger)';
+        case 'expired': return 'var(--dp-color-ink-secondary)';
+        default: return 'var(--dp-color-rule)';
     }
 }
 
@@ -163,13 +210,13 @@ const TERMINAL_STATUSES = ['completed', 'cancelled', 'expired'];
 async function loadMyOffers() {
     const container = document.getElementById('offers-list');
     if (!container) return;
-    container.innerHTML = '<p style="color: var(--text-muted);">Φόρτωση αγγελιών...</p>';
+    container.innerHTML = '<p style="color: var(--dp-color-ink-secondary);">Φόρτωση αγγελιών...</p>';
 
     try {
         const result = await UniBiteAuth.apiCall('api/get_my_offers.php', {}, 'GET');
-        
+
         if (!result.success) {
-            container.innerHTML = '<p style="color: var(--danger-color);">' + (result.error || 'Σφάλμα φόρτωσης αγγελιών. Συνδεθείτε ως μάγειρας.') + '</p>';
+            container.innerHTML = '<p style="color: var(--dp-color-danger);">' + (result.error || 'Σφάλμα φόρτωσης αγγελιών. Συνδεθείτε ως μάγειρας.') + '</p>';
             return;
         }
 
@@ -177,56 +224,93 @@ async function loadMyOffers() {
         const visibleOffers = (result.offers || []).filter(o => o.status !== 'cancelled' && o.status !== 'expired');
 
         if (visibleOffers.length === 0) {
-            container.innerHTML = '<p style="color: var(--text-muted);">Δεν έχετε δημιουργήσει καμία αγγελία ακόμα.</p>';
+            container.innerHTML = '<p style="color: var(--dp-color-ink-secondary);">Δεν έχετε δημιουργήσει καμία αγγελία ακόμα.</p>';
             return;
         }
 
-        container.innerHTML = visibleOffers.map(offer => `
-                    <div class="offer-card" id="offer-${offer.id}">
-                        ${offer.photo ? '<img src="' + escapeHtml(offer.photo.replace('Cook/', '')) + '" alt="" style="width:100%; max-height:200px; object-fit:cover; border-radius:8px; margin-bottom:0.5rem;">' : ''}
-                        <div class="offer-header">
-                            <h3>${escapeHtml(offer.title)}</h3>
-                            <span class="badge badge-${offer.status}">${translateStatus(offer.status)}</span>
-                        </div>
-                        <p>${escapeHtml(offer.description)}</p>
-                        ${offer.allergens ? '<p style="font-size:0.8rem; color:var(--text-muted); margin:0.5rem 0;"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : ''}
-                        <p style="margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);">
-                            🥣 Μερίδες: <strong>${offer.portions}</strong> | 📍 Σημείο: <strong>${escapeHtml(offer.pickup_location)}</strong> | ⏰ ${offer.pickup_time}
-                        </p>
-                        <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-                            ${!TERMINAL_STATUSES.includes(offer.status) ? `<button class="btn btn-outline" onclick="openEditModal(${offer.id})">Επεξεργασία</button>` : ''}
-                            <button class="btn btn-outline" onclick="deleteOffer(${offer.id})">Διαγραφή</button>
-                        </div>
-                
-                <div style="margin-top: 1rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
-                    <h4 style="font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--secondary-color);">Αιτήματα Φοιτητών (${offer.requests.length})</h4>
-                    ${offer.requests.length === 0 ? '<p style="font-size: 0.85rem; color: var(--text-muted);">Κανένα αίτημα ακόμα.</p>' : 
-                        offer.requests.map(req => `
-                            <div class="request-item">
-                                <div>
-                                    <strong>${escapeHtml(req.consumer_name)}</strong> 
-                                    <span style="font-size: 0.8rem; color: var(--text-muted);">[${req.status}]</span>
-                                </div>
-                                <div style="display: flex; gap: 0.3rem;">
-                                    ${req.status === 'pending' ? `
-                                        <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'approve')">Έγκριση</button>
-                                        <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'reject')">Απόρριψη</button>
-                                    ` : ''}
-                                    ${req.status === 'approved' ? `
-                                        <button class="btn btn-primary" style="padding: 0.3rem 0.6rem; font-size: 0.8rem; background-color: var(--success-color);" onclick="handleRequest(${req.id}, 'delivered')">Παραδόθηκε</button>
-                                        <button class="btn btn-danger" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;" onclick="handleRequest(${req.id}, 'absent')">Απών</button>
-                                    ` : ''}
-                                </div>
-                            </div>
-                        `).join('')}
-                </div>
-            </div>
-        `).join('');
+        container.innerHTML = visibleOffers.map(offer => {
+            const photoHtml = offer.photo ? '<img src="' + escapeHtml(offer.photo.replace('Cook/', '')) + '" alt="" style="width:100%; height:120px; object-fit:cover; border-radius:8px; border: var(--dp-border-hairline) solid var(--dp-color-rule);">' : '';
+
+            const requestsHtml = offer.requests.map(req => {
+                const hasRating = req.rating !== null && req.rating !== undefined && req.rating !== '';
+                const isPenalized = req.penalized == 1 || req.penalized === '1';
+                const isDelivered = req.status === 'delivered';
+
+                let ratingHtml = '';
+                if (hasRating) {
+                    const starStr = '⭐'.repeat(parseInt(req.rating));
+                    const pointsStr = req.rating >= 4 ? '+2' : '+1';
+                    const commentHtml = req.comment ? '<span class="rating-comment">"' + escapeHtml(req.comment) + '"</span>' : '';
+                    const ratingDate = req.rating_created_at ? req.rating_created_at.split('T')[0] : '';
+                    ratingHtml = '<div class="request-rating">' +
+                        '<span class="rating-stars">' + starStr + '</span>' +
+                        '<span class="rating-points">Πόντοι: ' + pointsStr + '</span>' +
+                        '<span class="rating-consumer">από ' + escapeHtml(req.consumer_name) + '</span>' +
+                        commentHtml +
+                        (ratingDate ? '<span class="rating-date">' + ratingDate + '</span>' : '') +
+                    '</div>';
+                } else if (isDelivered && !isPenalized) {
+                    ratingHtml = '<div class="request-rating"><span class="rating-pending">(Εκκρεμεί αξιολόγηση)</span></div>';
+                } else if (isDelivered && isPenalized) {
+                    ratingHtml = '<div class="request-rating"><span class="rating-penalized">(Έληξε η προθεσμία αξιολόγησης)</span></div>';
+                }
+
+                const actionsHtml = req.status === 'pending'
+                    ? '<button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'approve\')">Έγκριση</button>' +
+                      '<button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'reject\')">Απόρριψη</button>'
+                    : (req.status === 'approved'
+                        ? '<button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem; background-color: var(--dp-color-success);" onclick="handleRequest(' + req.id + ', \'delivered\')">Παραδόθηκε</button>' +
+                          '<button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'absent\')">Απών</button>'
+                        : '');
+
+                return '<div class="request-item">' +
+                    '<div class="request-item-header">' +
+                        '<span class="consumer-name">' + escapeHtml(req.consumer_name) + '</span>' +
+                        '<span class="request-status">' + req.status + '</span>' +
+                    '</div>' +
+                    '<div class="request-actions">' + actionsHtml + '</div>' +
+                    ratingHtml +
+                '</div>';
+            }).join('');
+
+            return '<div class="offer-card" id="offer-' + offer.id + '">' +
+                '<div class="offer-left">' +
+                    photoHtml +
+                    '<div class="offer-header">' +
+                        '<div class="offer-header-left">' +
+                            '<h3>' + escapeHtml(offer.title) + '</h3>' +
+                            '<span class="badge badge-' + offer.status + '">' + translateStatus(offer.status) + '</span>' +
+                        '</div>' +
+                        '<div class="offer-actions">' +
+                            (!TERMINAL_STATUSES.includes(offer.status) ? '<button class="btn btn-outline" onclick="openEditModal(' + offer.id + ')">Επεξεργασία</button>' : '') +
+                            '<button class="btn btn-outline" onclick="deleteOffer(' + offer.id + ')">Διαγραφή</button>' +
+                        '</div>' +
+                    '</div>' +
+                    '<p>' + escapeHtml(offer.description) + '</p>' +
+                    (offer.allergens ? '<p class="offer-allergens"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : '') +
+                    '<p class="offer-meta">' +
+                        '<span><strong>🥣 Μερίδες:</strong> ' + offer.portions + '</span>' +
+                        '<span><strong>📍 Σημείο:</strong> ' + escapeHtml(offer.pickup_location) + '</span>' +
+                        '<span><strong>⏰</strong> ' + offer.pickup_time + '</span>' +
+                    '</p>' +
+                '</div>' +
+                '<div class="offer-right">' +
+                    '<div class="requests-section">' +
+                        '<h4>Αιτήματα Φοιτητών (' + offer.requests.length + ')</h4>' +
+                        (offer.requests.length === 0
+                            ? '<p style="font-size: 0.85rem; color: var(--dp-color-ink-secondary);">Κανένα αίτημα ακόμα.</p>'
+                            : '<div class="requests-list"><div class="requests-grid">' + requestsHtml + '</div></div>') +
+                    '</div>' +
+                '</div>' +
+            '</div>';
+        }).join('');
     } catch (error) {
         console.error('loadMyOffers error:', error);
-        container.innerHTML = '<p style="color: var(--danger-color);">Σφάλμα σύνδεσης. Ελέγξτε αν είναι συνδεδεμένοι ως μάγειρας.</p>';
+        container.innerHTML = '<p style="color: var(--dp-color-danger);">Σφάλμα σύνδεσης. Ελέγξτε αν είναι συνδεδεμένοι ως μάγειρας.</p>';
     }
 }
+
+// ... rest of the file remains the same
 
 async function handleCreateOffer(e) {
     e.preventDefault();
@@ -339,7 +423,7 @@ function openEditModal(offerId) {
                                 // Populate allergens checkboxes in edit modal
                 const existingAllergens = offer.allergens ? offer.allergens.split(',').map(a => a.trim()) : [];
                 populateAllergens('edit-allergens-container', existingAllergens);
-                
+
                 // Parse existing pickup_location ID and populate edit modal dropdown
                 if (typeof parsePickupLocationForEdit === 'function') {
                     parsePickupLocationForEdit(offer.pickup_location);
@@ -351,7 +435,7 @@ function openEditModal(offerId) {
                         editSelect.dispatchEvent(new Event('change'));
                     }
                 }
-                
+
                 // Show existing photo preview
                 const previewDiv = document.getElementById('edit-photo-preview');
                 const previewImg = document.getElementById('edit-photo-img');
@@ -361,10 +445,10 @@ function openEditModal(offerId) {
                 } else {
                     previewDiv.style.display = 'none';
                 }
-                
+
                 // Clear file input
                 document.getElementById('edit-photo').value = '';
-                
+
                 document.getElementById('edit-modal').classList.add('active');
             }
         }
@@ -399,7 +483,7 @@ async function handleEditOffer(e) {
     const pickupTime = document.getElementById('edit-pickup_time').value;
     const editTimeInput = document.getElementById('edit-pickup_time');
     const originalTime = editTimeInput.dataset.originalTime;
-    
+
     if (!pickupTime) {
         UniBiteAuth.showToast('Η ώρα παραλαβής είναι υποχρεωτική.', 'error');
         return;
@@ -407,7 +491,7 @@ async function handleEditOffer(e) {
     // Normalize both times for comparison (datetime-local is YYYY-MM-DDTHH:MM, DB is YYYY-MM-DD HH:MM:SS)
     const normalizeForCompare = (dt) => dt.replace(' ', 'T').slice(0, 16);
     const isTimeChanged = normalizeForCompare(pickupTime) !== normalizeForCompare(originalTime);
-    
+
     // Only validate future/48h if the time was CHANGED from original
     if (isTimeChanged) {
         const now = new Date();
@@ -497,7 +581,7 @@ function translateStatus(status) {
 
 function escapeHtml(str) {
     if (str === null || str === undefined) return '';
-    return String(str).replace(/[&<>"']/g, function(tag) {
+    return String(str).replace(/[&<>\"']/g, function(tag) {
         const chars = {
             '&': '&',
             '<': '<',
@@ -540,7 +624,7 @@ function populateAllergens(containerId, selectedAllergens = []) {
         const id = `allergen-${allergen.replace(/[^a-zA-Z0-9α-ωΑ-Ω]/g, '-')}`;
         return `
             <label style="display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; cursor: pointer;">
-                <input type="checkbox" name="allergens" value="${allergen}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--primary-color);">
+                <input type="checkbox" name="allergens" value="${allergen}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--dp-color-accent);">
                 <span>${allergen}</span>
             </label>
         `;
@@ -552,7 +636,7 @@ function setupPickupLocationAutofill(selectId, coordinatesId) {
     const select = document.getElementById(selectId);
     const coordinatesInput = document.getElementById(coordinatesId);
     if (!select || !coordinatesInput) return;
-  
+
     select.addEventListener('change', function() {
         const selectedOption = this.options[this.selectedIndex];
         if (selectedOption && selectedOption.dataset.lat && selectedOption.dataset.lng) {
@@ -567,7 +651,7 @@ function setupPickupLocationAutofill(selectId, coordinatesId) {
 function parsePickupLocationForEdit(location) {
     const editSelect = document.getElementById('edit-pickup_location');
     if (!editSelect || !location) return;
-  
+
     // Try to match by value (location ID)
     for (let option of editSelect.options) {
         if (option.value === location) {
@@ -577,7 +661,7 @@ function parsePickupLocationForEdit(location) {
             return;
         }
     }
-  
+
     // Fallback: try to match by text content (legacy format)
     const legacyMap = {
         'Φοιτητική Εστία Α': 'fep-building-a',
@@ -605,7 +689,7 @@ function parsePickupLocationForEdit(location) {
         'Φοιτητική Λέσχη': 'fep-canteen',
         'Κουκούλι': 'koukouli-dormitory'
     };
-  
+
     for (const [key, value] of Object.entries(legacyMap)) {
         if (location.includes(key)) {
             editSelect.value = value;

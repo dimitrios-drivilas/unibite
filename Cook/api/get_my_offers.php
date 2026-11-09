@@ -22,7 +22,13 @@ $stmt->execute([$cook_id]);
 $offers = $stmt->fetchAll();
 
 foreach ($offers as &$offer) {
-    $reqStmt = $pdo->prepare("SELECT r.*, u.username as consumer_name FROM requests r JOIN users u ON r.consumer_id = u.id WHERE r.offer_id = ?");
+    $reqStmt = $pdo->prepare("SELECT r.*, u.username as consumer_name,
+        rt.rating, rt.comment, rt.created_at as rating_created_at
+        FROM requests r 
+        JOIN users u ON r.consumer_id = u.id
+        LEFT JOIN ratings rt ON rt.offer_id = r.offer_id AND rt.consumer_id = r.consumer_id
+        WHERE r.offer_id = ?
+        ORDER BY r.created_at DESC");
     $reqStmt->execute([$offer['id']]);
     $offer['requests'] = $reqStmt->fetchAll();
 }

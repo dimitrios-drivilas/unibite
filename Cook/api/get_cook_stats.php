@@ -50,7 +50,27 @@ try {
     $ratingCount = $ratingData['rating_count'] ?? 0;
     $avgRating = $ratingCount > 0 ? round($ratingData['avg_rating'], 1) : null;
 
-    // Offers with ratings detail
+    // Points earned from offers (ratings): 4-5 stars = +2, 1-3 stars = +1
+    $stmt = $pdo->prepare("
+        SELECT SUM(CASE WHEN rt.rating > 3 THEN 2 ELSE 1 END) as points_from_offers
+        FROM ratings rt
+        JOIN offers o ON rt.offer_id = o.id
+        WHERE o.cook_id = ?
+    ");
+    $stmt->execute([$cook_id]);
+    $pointsFromOffers = (int)($stmt->fetchColumn() ?? 0);
+
+    // Penalties received (as consumer): rating penalties (penalized=1) + absence penalties (status='absent')
+    $stmt = $pdo->prepare("
+        SELECT 
+            (SELECT COUNT(*) FROM requests WHERE consumer_id = ? AND penalized = 1) as rating_penalties,
+            (SELECT COUNT(*) FROM requests WHERE consumer_id = ? AND status = 'absent') as absence_penalties
+    ");
+    $stmt->execute([$cook_id, $cook_id]);
+    $penaltyData = $stmt->fetch();
+    $penaltiesReceived = (int)($penaltyData['rating_penalties'] ?? 0) + (int)($penaltyData['absence_penalties'] ?? 0);
+
+    // 1. Get all offers for this cook (without ratings to avoid cartesian product)
     $stmt = $pdo->prepare("
         SELECT 
             o.id,
@@ -59,14 +79,9 @@ try {
             o.created_at,
             o.status,
             COUNT(DISTINCT rq.id) as total_requests,
-            COUNT(DISTINCT CASE WHEN rq.status = 'delivered' THEN rq.id END) as delivered_requests,
-            COALESCE(AVG(rt.rating), 0) as avg_rating,
-            COUNT(rt.id) as rating_count,
-            GROUP_CONCAT(DISTINCT rt.rating ORDER BY rt.rating DESC) as all_ratings,
-            GROUP_CONCAT(DISTINCT rt.comment ORDER BY rt.created_at DESC) as all_comments
+            COUNT(DISTINCT CASE WHEN rq.status = 'delivered' THEN rq.id END) as delivered_requests
         FROM offers o
         LEFT JOIN requests rq ON rq.offer_id = o.id
-        LEFT JOIN ratings rt ON rt.offer_id = o.id
         WHERE o.cook_id = ?
         GROUP BY o.id
         ORDER BY o.created_at DESC
@@ -74,20 +89,42 @@ try {
     $stmt->execute([$cook_id]);
     $offers = $stmt->fetchAll();
 
-    // Format offers for display
+    // 2. Get ALL ratings for these offers in ONE separate query
+    $offerIds = array_column($offers, 'id');
+    $ratingsByOffer = [];
+    if (!empty($offerIds)) {
+        $placeholders = str_repeat('?,', count($offerIds) - 1) . '?';
+        $stmt = $pdo->prepare("
+            SELECT 
+                rt.offer_id,
+                rt.rating,
+                rt.comment,
+                rt.created_at,
+                u.username as consumer_name
+            FROM ratings rt
+            LEFT JOIN users u ON u.id = rt.consumer_id
+            WHERE rt.offer_id IN ($placeholders)
+            ORDER BY rt.offer_id, rt.created_at DESC
+        ");
+        $stmt->execute($offerIds);
+        $allRatings = $stmt->fetchAll();
+        
+        foreach ($allRatings as $r) {
+            $ratingsByOffer[$r['offer_id']][] = [
+                'rating' => (int)$r['rating'],
+                'comment' => $r['comment'] ?? '',
+                'consumer_name' => $r['consumer_name'] ?? 'Άγνωστος'
+            ];
+        }
+    }
+
+    // 3. Format offers for display with their ratings
     $formattedOffers = [];
     foreach ($offers as $offer) {
-        $ratings = [];
-        if ($offer['rating_count'] > 0) {
-            $ratingValues = explode(',', $offer['all_ratings']);
-            $comments = $offer['all_comments'] ? explode(',', $offer['all_comments']) : [];
-            for ($i = 0; $i < count($ratingValues); $i++) {
-                $ratings[] = [
-                    'rating' => (int)$ratingValues[$i],
-                    'comment' => $comments[$i] ?? ''
-                ];
-            }
-        }
+        $offerRatings = $ratingsByOffer[$offer['id']] ?? [];
+        $offerRatingCount = count($offerRatings);
+        $offerAvgRating = $offerRatingCount > 0 ? round(array_sum(array_column($offerRatings, 'rating')) / $offerRatingCount, 1) : 0;
+
         $formattedOffers[] = [
             'id' => $offer['id'],
             'title' => $offer['title'],
@@ -96,9 +133,9 @@ try {
             'status' => $offer['status'],
             'total_requests' => (int)$offer['total_requests'],
             'delivered_requests' => (int)$offer['delivered_requests'],
-            'avg_rating' => round($offer['avg_rating'], 1),
-            'rating_count' => (int)$offer['rating_count'],
-            'ratings' => $ratings
+            'avg_rating' => $offerAvgRating,
+            'rating_count' => $offerRatingCount,
+            'ratings' => $offerRatings
         ];
     }
 
@@ -109,7 +146,9 @@ try {
             'total_offers' => $totalOffers,
             'total_portions' => $totalPortions,
             'avg_rating' => $avgRating,
-            'rating_count' => $ratingCount
+            'rating_count' => $ratingCount,
+            'points_from_offers' => $pointsFromOffers,
+            'penalties_received' => $penaltiesReceived
         ],
         'offers' => $formattedOffers
     ]);
