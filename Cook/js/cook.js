@@ -305,11 +305,18 @@ async function handleCreateOffer(e) {
     if (pickupValue === 'dorm_custom') {
         const dormBuilding = (document.getElementById('dorm-building')?.value || '').trim();
         const dormNumber = (document.getElementById('dorm-number')?.value || '').trim();
-        if (!dormBuilding || !dormNumber) {
+        const legacyDormRoom = (document.getElementById('dorm-room')?.value || '').trim();
+
+        let dormRoom = '';
+        if (dormBuilding && dormNumber) {
+            dormRoom = `${dormBuilding}, Δωμάτιο ${dormNumber}`;
+        } else if (legacyDormRoom) {
+            dormRoom = legacyDormRoom;
+        } else {
             UniBiteAuth.showToast('Συμπληρώστε το κτίριο και τον αριθμό δωματίου της εστίας.', 'error');
             return;
         }
-        const dormRoom = `${dormBuilding}, Δωμάτιο ${dormNumber}`;
+
         finalPickupLocation = `dorm_custom: ${dormRoom}`;
         const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
         finalLatitude = selectedOption.dataset.lat || 38.2865;
@@ -319,6 +326,7 @@ async function handleCreateOffer(e) {
         const homeNumber = (document.getElementById('home-number')?.value || '').trim();
         const homeFloor = (document.getElementById('home-floor')?.value || '').trim();
         const homeBell = (document.getElementById('home-bell')?.value || '').trim();
+        const homeNotes = (document.getElementById('home-notes')?.value || '').trim();
         const coordsVal = (document.getElementById('coordinates')?.value || '').trim();
 
         if (!homeStreet || !homeNumber) {
@@ -333,9 +341,11 @@ async function handleCreateOffer(e) {
         if (homeBell) {
             locationParts.push(`Κουδούνι: ${homeBell}`);
         }
+        if (!homeFloor && !homeBell && homeNotes) {
+            locationParts.push(homeNotes);
+        }
         finalPickupLocation = `home_custom: ${locationParts.join(', ')}`;
 
-        // Use exact coordinates from the map pin picker!
         if (coordsVal && coordsVal.includes(',')) {
             const [latStr, lngStr] = coordsVal.split(',');
             finalLatitude = parseFloat(latStr.trim()) || 38.2466;
@@ -362,6 +372,22 @@ async function handleCreateOffer(e) {
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.disabled = true;
+
+    // Client-side image compression for photo upload
+    const photoInput = document.getElementById('photo');
+    if (photoInput && photoInput.files && photoInput.files[0]) {
+        const originalFile = photoInput.files[0];
+        if (originalFile.type.startsWith('image/')) {
+            submitBtn.textContent = 'Συμπίεση εικόνας...';
+            try {
+                const compressedFile = await compressImage(originalFile, 1200, 1200, 0.8);
+                formData.set('photo', compressedFile, compressedFile.name);
+            } catch (err) {
+                console.warn('Image compression failed, uploading original:', err);
+            }
+        }
+    }
+
     submitBtn.textContent = 'Δημιουργία...';
 
     try {
@@ -450,7 +476,7 @@ function openEditModal(offerId) {
                 }
 
                 document.getElementById('edit-photo').value = '';
-                document.getElementById('edit-modal').classList.add('active');
+                openModal('edit-modal');
 
                 if (editHomeMapInstance) {
                     setTimeout(() => editHomeMapInstance.invalidateSize(), 200);
@@ -461,7 +487,7 @@ function openEditModal(offerId) {
 }
 
 function closeEditModal() {
-    document.getElementById('edit-modal').classList.remove('active');
+    closeModal('edit-modal');
 }
 
 async function handleEditOffer(e) {
@@ -483,11 +509,18 @@ async function handleEditOffer(e) {
     if (pickupValue === 'dorm_custom') {
         const dormBuilding = (document.getElementById('edit-dorm-building')?.value || '').trim();
         const dormNumber = (document.getElementById('edit-dorm-number')?.value || '').trim();
-        if (!dormBuilding || !dormNumber) {
+        const legacyDormRoom = (document.getElementById('edit-dorm-room')?.value || '').trim();
+
+        let dormRoom = '';
+        if (dormBuilding && dormNumber) {
+            dormRoom = `${dormBuilding}, Δωμάτιο ${dormNumber}`;
+        } else if (legacyDormRoom) {
+            dormRoom = legacyDormRoom;
+        } else {
             UniBiteAuth.showToast('Συμπληρώστε το κτίριο και τον αριθμό δωματίου.', 'error');
             return;
         }
-        const dormRoom = `${dormBuilding}, Δωμάτιο ${dormNumber}`;
+
         finalPickupLocation = `dorm_custom: ${dormRoom}`;
         const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
         finalLatitude = selectedOption.dataset.lat || 38.2865;
@@ -497,6 +530,7 @@ async function handleEditOffer(e) {
         const homeNumber = (document.getElementById('edit-home-number')?.value || '').trim();
         const homeFloor = (document.getElementById('edit-home-floor')?.value || '').trim();
         const homeBell = (document.getElementById('edit-home-bell')?.value || '').trim();
+        const homeNotes = (document.getElementById('edit-home-notes')?.value || '').trim();
         const coordsVal = (document.getElementById('edit-coordinates')?.value || '').trim();
 
         if (!homeStreet || !homeNumber) {
@@ -510,6 +544,9 @@ async function handleEditOffer(e) {
         }
         if (homeBell) {
             locationParts.push(`Κουδούνι: ${homeBell}`);
+        }
+        if (!homeFloor && !homeBell && homeNotes) {
+            locationParts.push(homeNotes);
         }
         finalPickupLocation = `home_custom: ${locationParts.join(', ')}`;
 
@@ -563,6 +600,22 @@ async function handleEditOffer(e) {
     }
 
     submitBtn.disabled = true;
+
+    // Client-side image compression for photo upload (edit modal)
+    const editPhotoInput = document.getElementById('edit-photo');
+    if (editPhotoInput && editPhotoInput.files && editPhotoInput.files[0]) {
+        const originalFile = editPhotoInput.files[0];
+        if (originalFile.type.startsWith('image/')) {
+            submitBtn.textContent = 'Συμπίεση εικόνας...';
+            try {
+                const compressedFile = await compressImage(originalFile, 1200, 1200, 0.8);
+                formData.set('photo', compressedFile, compressedFile.name);
+            } catch (err) {
+                console.warn('Image compression failed, uploading original:', err);
+            }
+        }
+    }
+
     submitBtn.textContent = 'Αποθήκευση...';
 
     try {
@@ -672,7 +725,6 @@ function setupPickupLocationAutofill(selectId, coordinatesId) {
     });
 }
 
-// Setup custom location field visibility (dorm_custom / home_custom)
 function setupCustomLocationFields(selectId, dormFieldId, homeFieldsId, homeNotesFieldId, hintId) {
     const select = document.getElementById(selectId);
     const dormField = document.getElementById(dormFieldId);
@@ -692,11 +744,13 @@ function setupCustomLocationFields(selectId, dormFieldId, homeFieldsId, homeNote
 
         const dormBuildingInput = dormField ? dormField.querySelector('input[name="dorm_building"]') : null;
         const dormNumberInput = dormField ? dormField.querySelector('input[name="dorm_number"]') : null;
+        const legacyDormInput = dormField ? dormField.querySelector('input[name="dorm_room"]') : null;
         const homeStreetInput = homeFields ? homeFields.querySelector('input[name="home_street"]') : null;
         const homeNumberInput = homeFields ? homeFields.querySelector('input[name="home_number"]') : null;
 
         if (dormBuildingInput) dormBuildingInput.required = isDormCustom;
         if (dormNumberInput) dormNumberInput.required = isDormCustom;
+        if (legacyDormInput) legacyDormInput.required = isDormCustom;
         if (homeStreetInput) homeStreetInput.required = isHomeCustom;
         if (homeNumberInput) homeNumberInput.required = isHomeCustom;
 
@@ -723,7 +777,6 @@ function setupCustomLocationFields(selectId, dormFieldId, homeFieldsId, homeNote
     updateFields();
 }
 
-// Initialize Leaflet map for home pin picker
 function initHomeMap(mapContainerId, streetInputId, numberInputId, coordinatesInputId) {
     if (typeof L === 'undefined') {
         console.warn('Leaflet not loaded');
@@ -737,7 +790,6 @@ function initHomeMap(mapContainerId, streetInputId, numberInputId, coordinatesIn
 
     if (!mapContainer) return;
 
-    // If already initialized, just resize it properly
     if (mapContainerId === 'home-map' && homeMapInstance) {
         setTimeout(() => homeMapInstance.invalidateSize(), 100);
         return;
@@ -833,7 +885,6 @@ function parsePickupLocationForEdit(location, lat, lng) {
         editSelect.dispatchEvent(new Event('change'));
 
         const dormRoom = location.replace('dorm_custom:', '').trim();
-        // Parse "Κτίριο Α, Δωμάτιο 112" format
         const parts = dormRoom.split(',').map(p => p.trim());
         let building = '';
         let number = '';
@@ -841,13 +892,15 @@ function parsePickupLocationForEdit(location, lat, lng) {
             if (part.startsWith('Δωμάτιο')) {
                 number = part.replace('Δωμάτιο', '').trim();
             } else {
-                building = part;
+                building = building ? `${building}, ${part}` : part;
             }
         }
         const dormBuildingInput = document.getElementById('edit-dorm-building');
         const dormNumberInput = document.getElementById('edit-dorm-number');
+        const legacyDormInput = document.getElementById('edit-dorm-room');
         if (dormBuildingInput) dormBuildingInput.value = building;
         if (dormNumberInput) dormNumberInput.value = number;
+        if (legacyDormInput) legacyDormInput.value = dormRoom;
         return;
     }
 
@@ -866,36 +919,26 @@ function parsePickupLocationForEdit(location, lat, lng) {
             const firstPart = parts[0];
             const match = firstPart.match(/^(.+?)\s+(\d+[a-zA-ZΑ-Ωα-ω]?)$/);
             if (match) {
-                if (homeStreetInput) homeStreetInput.value = match[1] + (parts[1] ? ', ' + parts[1] : '');
+                if (homeStreetInput) homeStreetInput.value = match[1] + (parts[1] && !parts[1].startsWith('Όροφος:') && !parts[1].startsWith('Κουδούνι:') ? ', ' + parts[1] : '');
                 if (homeNumberInput) homeNumberInput.value = match[2];
-                // Parse remaining parts for floor and bell
-                let floor = '';
-                let bell = '';
-                for (let i = 1; i < parts.length; i++) {
-                    if (parts[i].startsWith('Όροφος:')) {
-                        floor = parts[i].replace('Όροφος:', '').trim();
-                    } else if (parts[i].startsWith('Κουδούνι:')) {
-                        bell = parts[i].replace('Κουδούνι:', '').trim();
-                    }
-                }
-                if (homeFloorInput) homeFloorInput.value = floor;
-                if (homeBellInput) homeBellInput.value = bell;
             } else {
                 if (homeStreetInput) homeStreetInput.value = firstPart;
-                if (homeNumberInput && parts[1]) homeNumberInput.value = parts[1];
-                // Parse remaining parts for floor and bell
-                let floor = '';
-                let bell = '';
-                for (let i = 2; i < parts.length; i++) {
-                    if (parts[i].startsWith('Όροφος:')) {
-                        floor = parts[i].replace('Όροφος:', '').trim();
-                    } else if (parts[i].startsWith('Κουδούνι:')) {
-                        bell = parts[i].replace('Κουδούνι:', '').trim();
-                    }
+                if (homeNumberInput && parts[1] && !parts[1].startsWith('Όροφος:') && !parts[1].startsWith('Κουδούνι:')) {
+                    homeNumberInput.value = parts[1];
                 }
-                if (homeFloorInput) homeFloorInput.value = floor;
-                if (homeBellInput) homeBellInput.value = bell;
             }
+
+            let floor = '';
+            let bell = '';
+            for (let i = 1; i < parts.length; i++) {
+                if (parts[i].startsWith('Όροφος:')) {
+                    floor = parts[i].replace('Όροφος:', '').trim();
+                } else if (parts[i].startsWith('Κουδούνι:')) {
+                    bell = parts[i].replace('Κουδούνι:', '').trim();
+                }
+            }
+            if (homeFloorInput) homeFloorInput.value = floor;
+            if (homeBellInput) homeBellInput.value = bell;
         }
 
         if (lat && lng) {
@@ -917,4 +960,39 @@ function parsePickupLocationForEdit(location, lat, lng) {
             return;
         }
     }
+}
+
+// Client-side image compression for mobile uploads
+function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = e => {
+            const img = new Image();
+            img.src = e.target.result;
+            img.onload = () => {
+                let width = img.width, height = img.height;
+                if (width > maxWidth || height > maxHeight) {
+                    if (width > height) {
+                        height = Math.round(height * maxWidth / width);
+                        width = maxWidth;
+                    } else {
+                        width = Math.round(width * maxHeight / height);
+                        height = maxHeight;
+                    }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+                canvas.toBlob(blob => {
+                    if (!blob) return reject(new Error('Canvas toBlob failed'));
+                    const newName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+                    resolve(new File([blob], newName, { type: 'image/jpeg' }));
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
 }

@@ -1631,6 +1631,48 @@ body {
     }
 }
 
+/* ==========================================================================
+   Mobile Modal Fixes - iOS Safari Compatibility
+   ========================================================================== */
+/* Hidden by default - NO clicks/taps pass through */
+.modal-overlay:not(.active) {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Active modal - fully clickable */
+.modal-overlay.active {
+    display: flex !important;
+    pointer-events: auto !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+}
+
+.modal-overlay .modal {
+    position: relative !important;
+    z-index: 100000 !important;
+    pointer-events: auto !important;
+    touch-action: manipulation !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+}
+
+@media (max-width: 768px) {
+    .modal select,
+    .modal textarea,
+    .modal input,
+    .modal button {
+        font-size: 16px !important; /* Prevents iOS Safari auto-zoom */
+        pointer-events: auto !important;
+    }
+}
+
 .sr-only {
     position: absolute;
     width: 1px;

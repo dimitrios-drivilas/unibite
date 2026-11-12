@@ -141,7 +141,7 @@ $user = authGuard(['admin']);
         </section>
     </main>
 
-    <script src="../Shared/js/auth.js"></script>
+    <script src="../Shared/js/auth.js?v=<?= time() ?>"></script>
     <script src="js/admin.js?v=<?= time() ?>"></script>
 </body>
 </html>

@@ -298,6 +298,11 @@ if ($isLoggedIn) {
                                         <?php endif; ?>
                                     </div>
                                 </div>
+                                <div style="flex-shrink: 0;">
+                                    <button type="button" class="btn btn-primary" style="position: relative; z-index: 10; cursor: pointer; touch-action: manipulation;" data-rate-offer-id="<?= $req['offer_id'] ?>" data-rate-title="<?= htmlspecialchars(addslashes($req['title'])) ?>" onclick="openRatingModal(<?= $req['offer_id'] ?>, '<?= htmlspecialchars(addslashes($req['title'])) ?>')">
+                                        ⭐ Αξιολόγηση Τώρα
+                                    </button>
+                                </div>
                             </div>
                             <?php endforeach; ?>
 
@@ -519,7 +524,7 @@ if ($isLoggedIn) {
         </div>
     </div>
 
-    <script src="Shared/js/auth.js"></script>
+    <script src="Shared/js/auth.js?v=<?= time() ?>"></script>
     <script>
         let isLoginMode = true;
 
@@ -839,17 +844,17 @@ if ($isLoggedIn) {
             if (title) {
                 document.getElementById('rating-modal-title').textContent = '⭐ Αξιολόγηση: ' + title;
             }
-            const modal = document.getElementById('dashboard-rating-modal');
-            modal.style.display = 'flex';
-            
-            // Ασπίδα για να μην κλείσει ακαριαία
-            modal.dataset.justOpened = 'true';
-            setTimeout(() => { modal.dataset.justOpened = 'false'; }, 200);
+            openModal('dashboard-rating-modal');
         }
 
+        // Expose on window for global access and event delegation
+        window.openRatingModal = openRatingModal;
+
         function closeRatingModal() {
-            console.trace("Κάποιος προσπάθησε να κλείσει το modal, αλλά το μπλοκάραμε!");
+            closeModal('dashboard-rating-modal');
         }
+
+        window.closeRatingModal = closeRatingModal;
 
         async function submitDashboardRating(e) {
             e.preventDefault();
@@ -904,9 +909,9 @@ if ($isLoggedIn) {
             // });
 
             // Escape key support for rating modal
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') closeRatingModal();
-            });
+            // document.addEventListener('keydown', (e) => {
+            //     if (e.key === 'Escape') closeRatingModal();
+            // });
         });
 
         async function logout() {
@@ -936,6 +941,20 @@ if ($isLoggedIn) {
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'Escape') closeRatingModal();
             });
+
+            // Event delegation for rating buttons (mobile-friendly, works with dynamic content)
+            document.body.addEventListener('click', (e) => {
+                const ratingBtn = e.target.closest('[data-rate-offer-id]');
+                if (ratingBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const offerId = ratingBtn.getAttribute('data-rate-offer-id');
+                    const title = ratingBtn.getAttribute('data-rate-title');
+                    if (offerId && window.openRatingModal) {
+                        window.openRatingModal(parseInt(offerId, 10), title);
+                    }
+                }
+            }, { passive: false });
         });
 
         // --- doLogin() για την κάρτα σύνδεσης (hero-right) - GLOBAL SCOPE ---

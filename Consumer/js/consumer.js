@@ -121,6 +121,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize autocomplete for user location input
     setupUserLocationAutocomplete();
+
+    // Event delegation for rating buttons (mobile-friendly, works with dynamic content)
+    document.body.addEventListener('click', (e) => {
+        const ratingBtn = e.target.closest('[data-rate-offer-id]');
+        if (ratingBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            const offerId = ratingBtn.getAttribute('data-rate-offer-id');
+            if (offerId && window.openRatingModal) {
+                window.openRatingModal(parseInt(offerId, 10));
+            }
+        }
+    }, { passive: false });
 });
 
 function initMap() {
@@ -598,7 +611,7 @@ function renderMyRequests(requests, container) {
             </p>
             <p style="font-size: 0.85rem; color: var(--dp-color-ink-secondary);">Αιτήθηκε: ${formatDateTime(req.created_at)}</p>
             ${showRatingButton ? `
-                <button class="btn btn-outline" style="margin-top: 0.5rem; width: 100%;" onclick="openRatingModal(${req.offer_id})">
+                <button type="button" class="btn btn-outline" style="margin-top: 0.5rem; width: 100%; position: relative; z-index: 10; cursor: pointer; touch-action: manipulation;" data-rate-offer-id="${req.offer_id}">
                     ⭐ Αξιολόγηση Γεύματος
                 </button>
             ` : ''}
@@ -645,12 +658,17 @@ function openRatingModal(offerId) {
     document.getElementById('rating-offer-id').value = offerId;
     document.getElementById('rating-stars').value = '5';
     document.getElementById('rating-comment').value = '';
-    document.getElementById('rating-modal').classList.add('active');
+    openModal('rating-modal');
 }
 
+// Expose on window for global access and event delegation
+window.openRatingModal = openRatingModal;
+
 function closeRatingModal() {
-    document.getElementById('rating-modal').classList.remove('active');
+    closeModal('rating-modal');
 }
+
+window.closeRatingModal = closeRatingModal;
 
 document.getElementById('rating-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();

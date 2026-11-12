@@ -37,7 +37,6 @@ class UniBiteAuth {
         }
     }
 
-    // NEW: login() method - calls Shared/api/login.php and redirects by role
     static async login(identifier, password) {
         const result = await this.apiCall('Shared/api/login.php', {
             email: identifier,
@@ -57,7 +56,6 @@ class UniBiteAuth {
         return result;
     }
 
-    // UPDATED: logout() with dynamic relative path calculation
     static async logout(redirectUrl = '../index.php') {
         const pathDepth = this._getPathDepth();
         const logoutUrl = `${pathDepth}Shared/api/logout.php`;
@@ -70,7 +68,6 @@ class UniBiteAuth {
         }
     }
 
-    // Helper: calculates '../' depth from window.location.pathname
     static _getPathDepth() {
         const path = window.location.pathname;
         const parts = path.split('/').filter(Boolean);
@@ -79,7 +76,113 @@ class UniBiteAuth {
     }
 }
 
-// Global logout function for inline onclick handlers
 async function logout() {
     await UniBiteAuth.logout('../index.php');
 }
+
+// ==========================================================================
+// Clean Focus Trap for Modals (Keyboard Only - Tab & Escape)
+// No inert, no aria-hidden - works on iOS Safari
+// ==========================================================================
+
+function getActiveModalOverlay() {
+    return document.querySelector('.modal-overlay.active, .modal-overlay[style*="flex"], .modal-overlay[style*="block"]');
+}
+
+function getFocusableElements(modal) {
+    const selectors = 'select:not([disabled]), input:not([type="hidden"]):not([disabled]), textarea:not([disabled]), button:not([disabled]), a[href]';
+    return Array.from(modal.querySelectorAll(selectors)).filter(el => {
+        const style = window.getComputedStyle(el);
+        return style.display !== 'none' && style.visibility !== 'hidden' && el.offsetParent !== null;
+    });
+}
+
+function openModal(modalId, firstFocusSelector = null) {
+    const overlay = document.getElementById(modalId);
+    if (!overlay) return;
+    
+    // Close any other open modal first
+    const otherOverlay = getActiveModalOverlay();
+    if (otherOverlay && otherOverlay !== overlay) {
+        closeModal(otherOverlay.id);
+    }
+    
+    // Show modal
+    overlay.classList.add('active');
+    overlay.style.display = 'flex';
+    
+    // Focus first element (but NOT on mobile to avoid native picker issues)
+    if (firstFocusSelector && !isMobile()) {
+        const modal = overlay.querySelector('.modal');
+        if (modal) {
+            const firstEl = modal.querySelector(firstFocusSelector);
+            if (firstEl) {
+                setTimeout(() => firstEl.focus(), 50);
+            }
+        }
+    }
+}
+
+function closeModal(modalId) {
+    const overlay = document.getElementById(modalId);
+    if (!overlay) return;
+    
+    overlay.classList.remove('active');
+    overlay.style.display = 'none';
+}
+
+function isMobile() {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+// Global keydown handler for focus trapping (Tab & Escape only)
+document.addEventListener('keydown', function(e) {
+    const overlay = getActiveModalOverlay();
+    if (!overlay) return;
+    
+    const modal = overlay.querySelector('.modal');
+    if (!modal) return;
+    
+    // Escape - close modal
+    if (e.key === 'Escape') {
+        e.preventDefault();
+        const closeBtn = modal.querySelector('[onclick*="close"], [onclick*="Close"], .btn-outline, .btn-secondary');
+        if (closeBtn) {
+            closeBtn.click();
+        } else {
+            closeModal(overlay.id);
+        }
+        return;
+    }
+    
+    // Tab - trap focus inside modal
+    if (e.key !== 'Tab') return;
+    
+    const focusable = getFocusableElements(modal);
+    if (focusable.length === 0) return;
+    
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    
+    // Check if focus is outside modal or on last element going forward
+    if (!e.shiftKey) {
+        if (active === last || !modal.contains(active)) {
+            e.preventDefault();
+            first.focus();
+        }
+    } else {
+        // Shift + Tab - going backward
+        if (active === first) {
+            e.preventDefault();
+            last.focus();
+        }
+    }
+});
+
+// Close modal on overlay click (outside modal content)
+document.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-overlay')) {
+        closeModal(e.target.id);
+    }
+});
