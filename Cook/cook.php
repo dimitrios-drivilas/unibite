@@ -15,6 +15,8 @@ $user = authGuard(['cook']);
     <link href="https://fonts.googleapis.com/css2?family=Host+Grotesk:wght@400;500;600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../Shared/css/common.css?v=<?= time() ?>">
     <link rel="stylesheet" href="css/cook.css?v=<?= time() ?>">
+    <!-- Leaflet CSS for map pin picker -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
 </head>
 <body>
     <header class="navbar">
@@ -45,7 +47,7 @@ $user = authGuard(['cook']);
 
         <!-- Tab: Αγγελίες μου - Split Layout (Form + List) -->
         <div id="tab-offers" class="tab-panel active">
-            <div class="cook-grid" style="display: grid !important; grid-template-columns: 340px 1fr !important; gap: 28px !important; align-items: start !important;">
+            <div class="cook-grid">
                 <!-- Create Offer Column -->
                 <div class="card" style="height: fit-content;">
                     <h3>Νέα Αγγελία Φαγητού</h3>
@@ -120,12 +122,68 @@ $user = authGuard(['cook']);
                                             <option value="koukouli-student-union" data-lat="38.2535" data-lng="21.7325">Φοιτητική Λέσχη Κουκούλι</option>
                                         </optgroup>
                                     </optgroup>
+                                    <optgroup label="🏢 Φοιτητικές Εστίες (Προσαρμοσμένο)">
+                                        <option value="dorm_custom" data-lat="38.2865" data-lng="21.7862">🏢 Φοιτητικές Εστίες (με Αριθμό Δωματίου)</option>
+                                    </optgroup>
+                                    <optgroup label="🏠 Στο Σπίτι μου (Προσαρμοσμένο)">
+                                        <option value="home_custom" data-lat="38.2466" data-lng="21.7346">🏠 Στο Σπίτι μου (Οδός & Αριθμός)</option>
+                                    </optgroup>
                                 </select>
-                                <small class="form-hint">Επιλέξτε ένα από τα επίσημα σημεία παράδοσης του Πανεπιστημίου Πατρών</small>
+                                <small class="form-hint" id="pickup-hint">Επιλέξτε ένα από τα επίσημα σημεία παράδοσης του Πανεπιστημίου Πατρών</small>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Συντεταγμένες (αφανές)</label>
-                                <input type="text" id="coordinates" class="form-control" placeholder="π.χ. 37.983810, 23.727539" readonly>
+                            <!-- Dynamic field for dorm_custom -->
+                            <div class="form-group" id="dorm-custom-field" style="display: none;">
+                                <label class="form-label">ΚΤΙΡΙΟ & ΑΡΙΘΜΟΣ ΔΩΜΑΤΙΟΥ ΕΣΤΙΑΣ <span style="color: var(--dp-color-danger);">*</span></label>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label">ΚΤΙΡΙΟ</label>
+                                        <input type="text" id="dorm-building" name="dorm_building" class="form-control" placeholder="π.χ. ΦΕΠ Κτίριο Α" autocomplete="off">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label">ΑΡΙΘΜΟΣ ΔΩΜΑΤΙΟΥ</label>
+                                        <input type="text" id="dorm-number" name="dorm_number" class="form-control" placeholder="π.χ. 112" autocomplete="off">
+                                    </div>
+                                </div>
+                                <small class="form-hint">Συμπληρώστε κτίριο/πτέρυγα και αριθμό δωματίου (π.χ. ΦΕΠ Κτίριο Β, Δωμ. 204)</small>
+                            </div>
+                            <!-- Dynamic fields for home_custom -->
+                            <div class="form-group" id="home-custom-fields" style="display: none;">
+                                <label class="form-label">ΕΠΙΛΟΓΗ ΣΠΙΤΙΟΥ ΣΤΟΝ ΧΆΡΤΗ <span style="color: var(--dp-color-danger);">*</span></label>
+                                
+                                <!-- Map Pin Picker -->
+                                <div style="margin-bottom: var(--dp-spacing-md);">
+                                    <p style="margin: 0 0 8px; font-size: var(--dp-typography-small); color: var(--dp-color-ink-secondary);">
+                                        <strong>📍 Οδηγίες:</strong> Κάντε κλικ στον χάρτη ή σύρετε την πινέζα ακριβώς πάνω στο σπίτι σας. Η διεύθυνση θα συμπληρωθεί αυτόματα.
+                                    </p>
+                                    <div id="home-map" style="height: 240px; border-radius: var(--dp-radius-control); border: var(--dp-border-hairline) solid var(--dp-color-rule); background: var(--dp-color-ground-muted);"></div>
+                                </div>
+                                
+                                <!-- Editable address fields (auto-filled from map) -->
+                                <div class="address-grid">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label">ΟΔΟΣ & ΠΕΡΙΟΧΗ <span style="color: var(--dp-color-danger);">*</span></label>
+                                        <input type="text" id="home-street" name="home_street" class="form-control" placeholder="π.χ. Κορίνθου, Πάτρα" autocomplete="off" required>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label">ΑΡΙΘΜΟΣ <span style="color: var(--dp-color-danger);">*</span></label>
+                                        <input type="text" id="home-number" name="home_number" class="form-control" placeholder="π.χ. 120" autocomplete="off" required>
+                                    </div>
+                                </div>
+                                
+                                <!-- Floor and Bell fields (side by side) -->
+                                <div class="floor-bell-grid">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label">ΟΡΟΦΟΣ</label>
+                                        <input type="text" id="home-floor" name="home_floor" class="form-control" placeholder="π.χ. 2ος" autocomplete="off">
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label class="form-label">ΟΝΟΜΑ ΣΤΟ ΚΟΥΔΟΥΝΙ</label>
+                                        <input type="text" id="home-bell" name="home_bell" class="form-control" placeholder="π.χ. Παπαδόπουλος" autocomplete="off">
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden coordinates field -->
+                                <input type="hidden" id="coordinates" name="coordinates" value="38.2466, 21.7346">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Ώρα Παραλαβής</label>
@@ -269,12 +327,68 @@ $user = authGuard(['cook']);
                                 <option value="koukouli-student-union" data-lat="38.2535" data-lng="21.7325">Φοιτητική Λέσχη Κουκούλι</option>
                             </optgroup>
                         </optgroup>
+                        <optgroup label="🏢 Φοιτητικές Εστίες (Προσαρμοσμένο)">
+                            <option value="dorm_custom" data-lat="38.2865" data-lng="21.7862">🏢 Φοιτητικές Εστίες (με Αριθμό Δωματίου)</option>
+                        </optgroup>
+                        <optgroup label="🏠 Στο Σπίτι μου (Προσαρμοσμένο)">
+                            <option value="home_custom" data-lat="38.2466" data-lng="21.7346">🏠 Στο Σπίτι μου (Οδός & Αριθμός)</option>
+                        </optgroup>
                     </select>
-                    <small class="form-hint">Επιλέξτε ένα από τα επίσημα σημεία παράδοσης του Πανεπιστημίου Πατρών</small>
+                    <small class="form-hint" id="edit-pickup-hint">Επιλέξτε ένα από τα επίσημα σημεία παράδοσης του Πανεπιστημίου Πατρών</small>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">Συντεταγμένες</label>
-                    <input type="text" id="edit-coordinates" name="coordinates" class="form-control" placeholder="π.χ. 37.983810, 23.727539">
+                <!-- Dynamic field for dorm_custom in edit modal -->
+                <div class="form-group" id="edit-dorm-custom-field" style="display: none;">
+                    <label class="form-label">ΚΤΙΡΙΟ & ΑΡΙΘΜΟΣ ΔΩΜΑΤΙΟΥ ΕΣΤΙΑΣ <span style="color: var(--dp-color-danger);">*</span></label>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">ΚΤΙΡΙΟ</label>
+                            <input type="text" id="edit-dorm-building" name="dorm_building" class="form-control" placeholder="π.χ. ΦΕΠ Κτίριο Α" autocomplete="off">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">ΑΡΙΘΜΟΣ ΔΩΜΑΤΙΟΥ</label>
+                            <input type="text" id="edit-dorm-number" name="dorm_number" class="form-control" placeholder="π.χ. 112" autocomplete="off">
+                        </div>
+                    </div>
+                    <small class="form-hint">Συμπληρώστε κτίριο/πτέρυγα και αριθμό δωματίου (π.χ. ΦΕΠ Κτίριο Β, Δωμ. 204)</small>
+                </div>
+                <!-- Dynamic fields for home_custom in edit modal -->
+                <div class="form-group" id="edit-home-custom-fields" style="display: none;">
+                    <label class="form-label">ΕΠΙΛΟΓΗ ΣΠΙΤΙΟΥ ΣΤΟΝ ΧΆΡΤΗ <span style="color: var(--dp-color-danger);">*</span></label>
+                    
+                    <!-- Map Pin Picker -->
+                    <div style="margin-bottom: var(--dp-spacing-md);">
+                        <p style="margin: 0 0 8px; font-size: var(--dp-typography-small); color: var(--dp-color-ink-secondary);">
+                            <strong>📍 Οδηγίες:</strong> Κάντε κλικ στον χάρτη ή σύρετε την πινέζα ακριβώς πάνω στο σπίτι σας. Η διεύθυνση θα συμπληρωθεί αυτόματα.
+                        </p>
+                        <div id="edit-home-map" style="height: 240px; border-radius: var(--dp-radius-control); border: var(--dp-border-hairline) solid var(--dp-color-rule); background: var(--dp-color-ground-muted);"></div>
+                    </div>
+                    
+                    <!-- Editable address fields (auto-filled from map) -->
+                    <div class="address-grid">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">ΟΔΟΣ & ΠΕΡΙΟΧΗ <span style="color: var(--dp-color-danger);">*</span></label>
+                            <input type="text" id="edit-home-street" name="home_street" class="form-control" placeholder="π.χ. Κορίνθου, Πάτρα" autocomplete="off" required>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">ΑΡΙΘΜΟΣ <span style="color: var(--dp-color-danger);">*</span></label>
+                            <input type="text" id="edit-home-number" name="home_number" class="form-control" placeholder="π.χ. 120" autocomplete="off" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Floor and Bell fields (side by side) -->
+                    <div class="floor-bell-grid">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">ΟΡΟΦΟΣ</label>
+                            <input type="text" id="edit-home-floor" name="home_floor" class="form-control" placeholder="π.χ. 2ος" autocomplete="off">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">ΟΝΟΜΑ ΣΤΟ ΚΟΥΔΟΥΝΙ</label>
+                            <input type="text" id="edit-home-bell" name="home_bell" class="form-control" placeholder="π.χ. Παπαδόπουλος" autocomplete="off">
+                        </div>
+                    </div>
+                    
+                    <!-- Hidden coordinates field -->
+                    <input type="hidden" id="edit-coordinates" name="coordinates" value="38.2466, 21.7346">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Ώρα Παραλαβής</label>
@@ -297,6 +411,7 @@ $user = authGuard(['cook']);
         </div>
     </div>
 
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="../Shared/js/auth.js"></script>
     <script src="js/cook.js?v=<?= time() ?>"></script>
 </body>

@@ -1,5 +1,11 @@
 // Cook/js/cook.js
 
+// Global references for Leaflet Map Pin Pickers
+let homeMapInstance = null;
+let homeMarkerInstance = null;
+let editHomeMapInstance = null;
+let editHomeMarkerInstance = null;
+
 document.addEventListener('DOMContentLoaded', () => {
     loadMyOffers();
     loadCookStats();
@@ -24,6 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Setup auto-fill for pickup location coordinates
     setupPickupLocationAutofill('pickup_location', 'coordinates');
     setupPickupLocationAutofill('edit-pickup_location', 'edit-coordinates');
+
+    // Setup custom location field visibility & Map Pin Picker
+    setupCustomLocationFields('pickup_location', 'dorm-custom-field', 'home-custom-fields', 'home-notes-field', 'pickup-hint');
+    setupCustomLocationFields('edit-pickup_location', 'edit-dorm-custom-field', 'edit-home-custom-fields', 'edit-home-notes-field', 'edit-pickup-hint');
 });
 
 function setupPickupTimeLimits() {
@@ -54,24 +64,32 @@ function setupTabs() {
         btn.addEventListener('click', () => {
             const tab = btn.dataset.tab;
 
-            // Update button states - just toggle classes, let CSS handle styling
             document.querySelectorAll('.tab-btn').forEach(b => {
                 b.classList.remove('active');
             });
             btn.classList.add('active');
 
-            // Show/hide panels
             document.querySelectorAll('.tab-panel').forEach(panel => {
                 panel.style.display = 'none';
             });
             document.getElementById('tab-' + tab).style.display = 'block';
 
-            // Load stats when switching to stats tab
             if (tab === 'stats') {
                 loadCookStats();
             }
         });
     });
+}
+
+function formatPickupLocationDisplay(loc) {
+    if (!loc) return '';
+    if (loc.startsWith('dorm_custom:')) {
+        return '🏢 Εστίες: ' + loc.replace('dorm_custom:', '').trim();
+    }
+    if (loc.startsWith('home_custom:')) {
+        return '🏠 Σπίτι: ' + loc.replace('home_custom:', '').trim();
+    }
+    return loc;
 }
 
 async function loadCookStats() {
@@ -83,14 +101,11 @@ async function loadCookStats() {
     document.getElementById('stat-total-portions').textContent = result.stats.total_portions;
     const avgRating = result.stats.avg_rating;
     const ratingCount = result.stats.rating_count;
-    console.log('DEBUG avgRating:', avgRating, 'ratingCount:', ratingCount);
     const ratingVal = (avgRating !== null && avgRating !== undefined && ratingCount > 0)
         ? parseFloat(avgRating).toFixed(1)
         : '-';
-    console.log('DEBUG ratingVal:', ratingVal);
     document.getElementById('stat-avg-rating').textContent = ratingVal;
 
-    // New stats
     document.getElementById('stat-points-from-offers').textContent = result.stats.points_from_offers > 0 ? '+' + result.stats.points_from_offers : '0';
 
     const penaltiesEl = document.getElementById('stat-penalties-received');
@@ -115,47 +130,30 @@ async function loadCookStats() {
 
         const requestsHtml = (offer.ratings || []).map(req => {
             const hasRating = req.rating !== null && req.rating !== undefined && req.rating !== '';
-            const isPenalized = req.penalized == 1 || req.penalized === '1';
-            const isDelivered = req.status === 'delivered';
-
             let ratingHtml = '';
             if (hasRating) {
                 const starStr = '⭐'.repeat(parseInt(req.rating));
                 const pointsStr = req.rating >= 4 ? '+2' : '+1';
-                const commentHtml = req.comment ? '<span class="rating-comment">"' + escapeHtml(req.comment) + '"</span>' : '';
+                const commentHtml = (req.comment && req.comment.trim() !== '')
+                    ? '<span class="rating-comment">"' + escapeHtml(req.comment) + '"</span>'
+                    : '<span class="rating-comment" style="font-style: italic; opacity: 0.75;">Δεν υπάρχουν διαθέσιμα σχόλια.</span>';
                 const ratingDate = req.rating_created_at ? req.rating_created_at.split('T')[0] : '';
                 ratingHtml = '<div class="request-rating">' +
                     '<span class="rating-stars">' + starStr + '</span>' +
                     '<span class="rating-points">Πόντοι: ' + pointsStr + '</span>' +
-                    '<span class="rating-consumer">από ' + escapeHtml(req.consumer_name) + '</span>' +
+                    (req.consumer_name ? '<span class="rating-consumer">από ' + escapeHtml(req.consumer_name) + '</span>' : '') +
                     commentHtml +
                     (ratingDate ? '<span class="rating-date">' + ratingDate + '</span>' : '') +
                 '</div>';
-            } else if (isDelivered && !isPenalized) {
-                ratingHtml = '<div class="request-rating"><span class="rating-pending">(Εκκρεμεί αξιολόγηση)</span></div>';
-            } else if (isDelivered && isPenalized) {
-                ratingHtml = '<div class="request-rating"><span class="rating-penalized">(Έληξε η προθεσμία αξιολόγησης)</span></div>';
             }
 
-            const actionsHtml = req.status === 'pending'
-                ? '<button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'approve\')">Έγκριση</button>' +
-                  '<button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'reject\')">Απόρριψη</button>'
-                : (req.status === 'approved'
-                    ? '<button class="btn btn-primary" style="padding: 4px 10px; font-size: 0.75rem; background-color: var(--dp-color-success);" onclick="handleRequest(' + req.id + ', \'delivered\')">Παραδόθηκε</button>' +
-                      '<button class="btn btn-danger" style="padding: 4px 10px; font-size: 0.75rem;" onclick="handleRequest(' + req.id + ', \'absent\')">Απών</button>'
-                    : '');
-
             return '<div class="request-item">' +
-                '<div class="request-item-header">' +
-                    '<span class="consumer-name">' + escapeHtml(req.consumer_name) + '</span>' +
-                    '<span class="request-status">' + req.status + '</span>' +
-                '</div>' +
-                '<div class="request-actions">' + actionsHtml + '</div>' +
+                (req.consumer_name ? '<div class="request-item-header"><span class="consumer-name">' + escapeHtml(req.consumer_name) + '</span></div>' : '') +
                 ratingHtml +
             '</div>';
         }).join('');
 
-        return '<div class="offer-card" id="offer-' + offer.id + '">' +
+        return '<div class="offer-card" id="stats-offer-' + offer.id + '">' +
             '<div class="offer-left">' +
                 photoHtml +
                 '<div class="offer-header">' +
@@ -163,24 +161,20 @@ async function loadCookStats() {
                         '<h3>' + escapeHtml(offer.title) + '</h3>' +
                         '<span class="badge badge-' + offer.status + '">' + translateStatus(offer.status) + '</span>' +
                     '</div>' +
-                    '<div class="offer-actions">' +
-                        (!TERMINAL_STATUSES.includes(offer.status) ? '<button class="btn btn-outline" onclick="openEditModal(' + offer.id + ')">Επεξεργασία</button>' : '') +
-                        '<button class="btn btn-outline" onclick="deleteOffer(' + offer.id + ')">Διαγραφή</button>' +
-                    '</div>' +
                 '</div>' +
-                '<p>' + escapeHtml(offer.description) + '</p>' +
+                '<p>' + escapeHtml(offer.description || '') + '</p>' +
                 (offer.allergens ? '<p class="offer-allergens"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : '') +
                 '<p class="offer-meta">' +
                     '<span><strong>🥣 Μερίδες:</strong> ' + offer.portions + '</span>' +
-                    '<span><strong>📍 Σημείο:</strong> ' + escapeHtml(offer.pickup_location) + '</span>' +
-                    '<span><strong>⏰</strong> ' + offer.pickup_time + '</span>' +
+                    '<span><strong>📍 Σημείο:</strong> ' + escapeHtml(formatPickupLocationDisplay(offer.pickup_location)) + '</span>' +
+                    (offer.pickup_time ? '<span><strong>⏰</strong> ' + offer.pickup_time + '</span>' : '') +
                 '</p>' +
             '</div>' +
             '<div class="offer-right">' +
                 '<div class="requests-section">' +
                     '<h4>Αξιολογήσεις (' + (offer.rating_count || 0) + ')</h4>' +
                     ((offer.ratings || []).length === 0
-                        ? '<p style="font-size: 0.85rem; color: var(--dp-color-ink-secondary);">Κανένα αξιολόγηση ακόμα.</p>'
+                        ? '<p style="font-size: 0.85rem; color: var(--dp-color-ink-secondary);">Δεν υπάρχουν αξιολογήσεις ακόμα.</p>'
                         : '<div class="requests-list"><div class="requests-grid">' + requestsHtml + '</div></div>') +
                 '</div>' +
             '</div>' +
@@ -188,23 +182,6 @@ async function loadCookStats() {
     }).join('');
 }
 
-function getStatusColor(status) {
-    switch(status) {
-        case 'active': return 'var(--dp-color-success)';
-        case 'inactive': return 'var(--dp-color-warning)';
-        case 'completed': return 'var(--dp-color-accent)';
-        case 'cancelled': return 'var(--dp-color-danger)';
-        case 'expired': return 'var(--dp-color-ink-secondary)';
-        default: return 'var(--dp-color-rule)';
-    }
-}
-
-function formatDate(dateStr) {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('el-GR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-// Terminal states that cannot be edited once set
 const TERMINAL_STATUSES = ['completed', 'cancelled', 'expired'];
 
 async function loadMyOffers() {
@@ -220,7 +197,6 @@ async function loadMyOffers() {
             return;
         }
 
-        // Show all offers except cancelled and expired ones
         const visibleOffers = (result.offers || []).filter(o => o.status !== 'cancelled' && o.status !== 'expired');
 
         if (visibleOffers.length === 0) {
@@ -290,7 +266,7 @@ async function loadMyOffers() {
                     (offer.allergens ? '<p class="offer-allergens"><strong>Αλλεργιογόνα:</strong> ' + escapeHtml(offer.allergens) + '</p>' : '') +
                     '<p class="offer-meta">' +
                         '<span><strong>🥣 Μερίδες:</strong> ' + offer.portions + '</span>' +
-                        '<span><strong>📍 Σημείο:</strong> ' + escapeHtml(offer.pickup_location) + '</span>' +
+                        '<span><strong>📍 Σημείο:</strong> ' + escapeHtml(formatPickupLocationDisplay(offer.pickup_location)) + '</span>' +
                         '<span><strong>⏰</strong> ' + offer.pickup_time + '</span>' +
                     '</p>' +
                 '</div>' +
@@ -306,11 +282,9 @@ async function loadMyOffers() {
         }).join('');
     } catch (error) {
         console.error('loadMyOffers error:', error);
-        container.innerHTML = '<p style="color: var(--dp-color-danger);">Σφάλμα σύνδεσης. Ελέγξτε αν είναι συνδεδεμένοι ως μάγειρας.</p>';
+        container.innerHTML = '<p style="color: var(--dp-color-danger);">Σφάλμα σύνδεσης. Ελέγξτε αν είστε συνδεδεμένοι ως μάγειρας.</p>';
     }
 }
-
-// ... rest of the file remains the same
 
 async function handleCreateOffer(e) {
     e.preventDefault();
@@ -318,20 +292,67 @@ async function handleCreateOffer(e) {
     const form = e.target;
     const formData = new FormData(form);
 
-    // Collect allergens from checkboxes (name="allergens" without [] sends only last value in PHP)
     const allergenCheckboxes = document.querySelectorAll('#allergens-container input[name="allergens"]:checked');
     const allergensArray = Array.from(allergenCheckboxes).map(cb => cb.value);
     formData.set('allergens', allergensArray.join(', '));
 
-    // Add lat/lng from selected option
     const pickupSelect = document.getElementById('pickup_location');
-    const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
-    if (selectedOption.dataset.lat && selectedOption.dataset.lng) {
-        formData.set('latitude', selectedOption.dataset.lat);
-        formData.set('longitude', selectedOption.dataset.lng);
+    const pickupValue = pickupSelect.value;
+    let finalPickupLocation = pickupValue;
+    let finalLatitude = 38.2466;
+    let finalLongitude = 21.7346;
+
+    if (pickupValue === 'dorm_custom') {
+        const dormBuilding = (document.getElementById('dorm-building')?.value || '').trim();
+        const dormNumber = (document.getElementById('dorm-number')?.value || '').trim();
+        if (!dormBuilding || !dormNumber) {
+            UniBiteAuth.showToast('Συμπληρώστε το κτίριο και τον αριθμό δωματίου της εστίας.', 'error');
+            return;
+        }
+        const dormRoom = `${dormBuilding}, Δωμάτιο ${dormNumber}`;
+        finalPickupLocation = `dorm_custom: ${dormRoom}`;
+        const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
+        finalLatitude = selectedOption.dataset.lat || 38.2865;
+        finalLongitude = selectedOption.dataset.lng || 21.7862;
+    } else if (pickupValue === 'home_custom') {
+        const homeStreet = (document.getElementById('home-street')?.value || '').trim();
+        const homeNumber = (document.getElementById('home-number')?.value || '').trim();
+        const homeFloor = (document.getElementById('home-floor')?.value || '').trim();
+        const homeBell = (document.getElementById('home-bell')?.value || '').trim();
+        const coordsVal = (document.getElementById('coordinates')?.value || '').trim();
+
+        if (!homeStreet || !homeNumber) {
+            UniBiteAuth.showToast('Επιλέξτε σημείο στον χάρτη ή συμπληρώστε Οδό και Αριθμό.', 'error');
+            return;
+        }
+
+        let locationParts = [`${homeStreet} ${homeNumber}`];
+        if (homeFloor) {
+            locationParts.push(`Όροφος: ${homeFloor}`);
+        }
+        if (homeBell) {
+            locationParts.push(`Κουδούνι: ${homeBell}`);
+        }
+        finalPickupLocation = `home_custom: ${locationParts.join(', ')}`;
+
+        // Use exact coordinates from the map pin picker!
+        if (coordsVal && coordsVal.includes(',')) {
+            const [latStr, lngStr] = coordsVal.split(',');
+            finalLatitude = parseFloat(latStr.trim()) || 38.2466;
+            finalLongitude = parseFloat(lngStr.trim()) || 21.7346;
+        }
+    } else {
+        const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.lat && selectedOption.dataset.lng) {
+            finalLatitude = selectedOption.dataset.lat;
+            finalLongitude = selectedOption.dataset.lng;
+        }
     }
 
-    // Only validate that pickup_time is provided (server will validate future date)
+    formData.set('pickup_location', finalPickupLocation);
+    formData.set('latitude', finalLatitude);
+    formData.set('longitude', finalLongitude);
+
     const pickupTime = document.getElementById('pickup_time').value;
     if (!pickupTime) {
         UniBiteAuth.showToast('Η ώρα παραλαβής είναι υποχρεωτική.', 'error');
@@ -355,7 +376,8 @@ async function handleCreateOffer(e) {
         if (result.success) {
             UniBiteAuth.showToast(result.message, 'success');
             form.reset();
-            document.getElementById('coordinates').value = '';
+            document.getElementById('coordinates').value = '38.2466, 21.7346';
+            document.getElementById('pickup_location').dispatchEvent(new Event('change'));
             loadMyOffers();
             loadCookStats();
         } else {
@@ -379,64 +401,45 @@ function openEditModal(offerId) {
                 document.getElementById('edit-title').value = offer.title;
                 document.getElementById('edit-description').value = offer.description;
                 document.getElementById('edit-portions').value = offer.portions;
-                document.getElementById('edit-pickup_location').value = offer.pickup_location;
-                document.getElementById('edit-coordinates').value = offer.latitude + ', ' + offer.longitude;
+                document.getElementById('edit-coordinates').value = (offer.latitude || 38.2466) + ', ' + (offer.longitude || 21.7346);
+
                 if (offer.pickup_time) {
                     const cleanTime = offer.pickup_time.replace(' ', 'T').slice(0, 16);
                     const editTimeInput = document.getElementById('edit-pickup_time');
                     editTimeInput.value = cleanTime;
-                    // Set min to the original pickup_time so the current value is always valid
-                    // This prevents HTML5 validation errors when editing offers with past pickup times
                     editTimeInput.min = cleanTime;
-                    // Store original pickup_time for edit validation
                     editTimeInput.dataset.originalTime = cleanTime;
                 }
-                                document.getElementById('edit-status').value = offer.status;
+                document.getElementById('edit-status').value = offer.status;
 
-                                // Show/hide warning banner for terminal statuses in edit modal
-                                const statusSelect = document.getElementById('edit-status');
-                                const existingWarning = document.getElementById('terminal-status-warning');
-                                if (existingWarning) existingWarning.remove();
+                const statusSelect = document.getElementById('edit-status');
+                const existingWarning = document.getElementById('terminal-status-warning');
+                if (existingWarning) existingWarning.remove();
 
-                                function updateTerminalWarning() {
-                                    const selectedStatus = statusSelect.value;
-                                    if (TERMINAL_STATUSES.includes(selectedStatus)) {
-                                        if (!document.getElementById('terminal-status-warning')) {
-                                            const warningDiv = document.createElement('div');
-                                            warningDiv.id = 'terminal-status-warning';
-                                            warningDiv.style.cssText = 'margin-top: 0.75rem; padding: 0.75rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; color: #991B1B; font-size: 0.875rem;';
-                                            warningDiv.innerHTML = '⚠️ <strong>Προσοχή:</strong> Αυτή η κατάσταση είναι τερματική. Αν αποθηκεύσετε, δεν θα μπορείτε να επαναφέρετε ή να επεξεργαστείτε ξανά την αγγελία.';
-                                            statusSelect.parentNode.insertBefore(warningDiv, statusSelect.nextSibling);
-                                        }
-                                    } else {
-                                        const existingWarning = document.getElementById('terminal-status-warning');
-                                        if (existingWarning) existingWarning.remove();
-                                    }
-                                }
-
-                                // Initial check
-                                updateTerminalWarning();
-
-                                // Listen for status changes
-                                statusSelect.addEventListener('change', updateTerminalWarning);
-
-                                // Populate allergens checkboxes in edit modal
-                const existingAllergens = offer.allergens ? offer.allergens.split(',').map(a => a.trim()) : [];
-                populateAllergens('edit-allergens-container', existingAllergens);
-
-                // Parse existing pickup_location ID and populate edit modal dropdown
-                if (typeof parsePickupLocationForEdit === 'function') {
-                    parsePickupLocationForEdit(offer.pickup_location);
-                } else {
-                    // Fallback: set value directly and trigger change for coordinates
-                    const editSelect = document.getElementById('edit-pickup_location');
-                    if (editSelect) {
-                        editSelect.value = offer.pickup_location;
-                        editSelect.dispatchEvent(new Event('change'));
+                function updateTerminalWarning() {
+                    const selectedStatus = statusSelect.value;
+                    if (TERMINAL_STATUSES.includes(selectedStatus)) {
+                        if (!document.getElementById('terminal-status-warning')) {
+                            const warningDiv = document.createElement('div');
+                            warningDiv.id = 'terminal-status-warning';
+                            warningDiv.style.cssText = 'margin-top: 0.75rem; padding: 0.75rem; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; color: #991B1B; font-size: 0.875rem;';
+                            warningDiv.innerHTML = '⚠️ <strong>Προσοχή:</strong> Αυτή η κατάσταση είναι τερματική. Αν αποθηκεύσετε, δεν θα μπορείτε να επαναφέρετε ή να επεξεργαστείτε ξανά την αγγελία.';
+                            statusSelect.parentNode.insertBefore(warningDiv, statusSelect.nextSibling);
+                        }
+                    } else {
+                        const w = document.getElementById('terminal-status-warning');
+                        if (w) w.remove();
                     }
                 }
 
-                // Show existing photo preview
+                updateTerminalWarning();
+                statusSelect.onchange = updateTerminalWarning;
+
+                const existingAllergens = offer.allergens ? offer.allergens.split(',').map(a => a.trim()) : [];
+                populateAllergens('edit-allergens-container', existingAllergens);
+
+                parsePickupLocationForEdit(offer.pickup_location, offer.latitude, offer.longitude);
+
                 const previewDiv = document.getElementById('edit-photo-preview');
                 const previewImg = document.getElementById('edit-photo-img');
                 if (offer.photo) {
@@ -446,10 +449,12 @@ function openEditModal(offerId) {
                     previewDiv.style.display = 'none';
                 }
 
-                // Clear file input
                 document.getElementById('edit-photo').value = '';
-
                 document.getElementById('edit-modal').classList.add('active');
+
+                if (editHomeMapInstance) {
+                    setTimeout(() => editHomeMapInstance.invalidateSize(), 200);
+                }
             }
         }
     });
@@ -461,38 +466,81 @@ function closeEditModal() {
 
 async function handleEditOffer(e) {
     e.preventDefault();
-    const offerId = document.getElementById('edit-offer-id').value;
 
     const form = e.target;
     const formData = new FormData(form);
 
-    // Collect allergens from edit modal checkboxes (name="allergens" without [] sends only last value in PHP)
     const allergenCheckboxes = document.querySelectorAll('#edit-allergens-container input[name="allergens"]:checked');
     const allergensArray = Array.from(allergenCheckboxes).map(cb => cb.value);
     formData.set('allergens', allergensArray.join(', '));
 
-    // Add lat/lng from selected option
     const pickupSelect = document.getElementById('edit-pickup_location');
-    const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
-    if (selectedOption.dataset.lat && selectedOption.dataset.lng) {
-        formData.set('latitude', selectedOption.dataset.lat);
-        formData.set('longitude', selectedOption.dataset.lng);
+    const pickupValue = pickupSelect.value;
+    let finalPickupLocation = pickupValue;
+    let finalLatitude = 38.2466;
+    let finalLongitude = 21.7346;
+
+    if (pickupValue === 'dorm_custom') {
+        const dormBuilding = (document.getElementById('edit-dorm-building')?.value || '').trim();
+        const dormNumber = (document.getElementById('edit-dorm-number')?.value || '').trim();
+        if (!dormBuilding || !dormNumber) {
+            UniBiteAuth.showToast('Συμπληρώστε το κτίριο και τον αριθμό δωματίου.', 'error');
+            return;
+        }
+        const dormRoom = `${dormBuilding}, Δωμάτιο ${dormNumber}`;
+        finalPickupLocation = `dorm_custom: ${dormRoom}`;
+        const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
+        finalLatitude = selectedOption.dataset.lat || 38.2865;
+        finalLongitude = selectedOption.dataset.lng || 21.7862;
+    } else if (pickupValue === 'home_custom') {
+        const homeStreet = (document.getElementById('edit-home-street')?.value || '').trim();
+        const homeNumber = (document.getElementById('edit-home-number')?.value || '').trim();
+        const homeFloor = (document.getElementById('edit-home-floor')?.value || '').trim();
+        const homeBell = (document.getElementById('edit-home-bell')?.value || '').trim();
+        const coordsVal = (document.getElementById('edit-coordinates')?.value || '').trim();
+
+        if (!homeStreet || !homeNumber) {
+            UniBiteAuth.showToast('Επιλέξτε σημείο στον χάρτη ή συμπληρώστε Οδό και Αριθμό.', 'error');
+            return;
+        }
+
+        let locationParts = [`${homeStreet} ${homeNumber}`];
+        if (homeFloor) {
+            locationParts.push(`Όροφος: ${homeFloor}`);
+        }
+        if (homeBell) {
+            locationParts.push(`Κουδούνι: ${homeBell}`);
+        }
+        finalPickupLocation = `home_custom: ${locationParts.join(', ')}`;
+
+        if (coordsVal && coordsVal.includes(',')) {
+            const [latStr, lngStr] = coordsVal.split(',');
+            finalLatitude = parseFloat(latStr.trim()) || 38.2466;
+            finalLongitude = parseFloat(lngStr.trim()) || 21.7346;
+        }
+    } else {
+        const selectedOption = pickupSelect.options[pickupSelect.selectedIndex];
+        if (selectedOption && selectedOption.dataset.lat && selectedOption.dataset.lng) {
+            finalLatitude = selectedOption.dataset.lat;
+            finalLongitude = selectedOption.dataset.lng;
+        }
     }
 
-    // Client-side validation for pickup_time
+    formData.set('pickup_location', finalPickupLocation);
+    formData.set('latitude', finalLatitude);
+    formData.set('longitude', finalLongitude);
+
     const pickupTime = document.getElementById('edit-pickup_time').value;
     const editTimeInput = document.getElementById('edit-pickup_time');
-    const originalTime = editTimeInput.dataset.originalTime;
+    const originalTime = editTimeInput.dataset.originalTime || '';
 
     if (!pickupTime) {
         UniBiteAuth.showToast('Η ώρα παραλαβής είναι υποχρεωτική.', 'error');
         return;
     }
-    // Normalize both times for comparison (datetime-local is YYYY-MM-DDTHH:MM, DB is YYYY-MM-DD HH:MM:SS)
-    const normalizeForCompare = (dt) => dt.replace(' ', 'T').slice(0, 16);
+    const normalizeForCompare = (dt) => (dt || '').replace(' ', 'T').slice(0, 16);
     const isTimeChanged = normalizeForCompare(pickupTime) !== normalizeForCompare(originalTime);
 
-    // Only validate future/48h if the time was CHANGED from original
     if (isTimeChanged) {
         const now = new Date();
         const selectedTime = new Date(pickupTime);
@@ -506,14 +554,10 @@ async function handleEditOffer(e) {
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
 
-    // Check if status is being changed to a terminal state
     const newStatus = formData.get('status');
-    const currentStatus = document.getElementById('edit-status').value; // This is the original value before form submission
-    if (TERMINAL_STATUSES.includes(newStatus) && newStatus !== currentStatus) {
-        const confirmed = confirm('⚠️ Προσοχή: Η αλλαγή της κατάστασης σε «Ολοκληρωμένη» ή «Ακυρωμένη» είναι οριστική (τερματική κατάσταση). Μετά την αποθήκευση ΔΕΝ θα μπορείτε να επεξεργαστείτε ξανά την αγγελία ή να την επαναφέρετε σε ενεργή. Θέλετε σίγουρα να συνεχίσετε;');
+    if (TERMINAL_STATUSES.includes(newStatus)) {
+        const confirmed = confirm('⚠️ Προσοχή: Η αλλαγή της κατάστασης σε «Ολοκληρωμένη» ή «Ακυρωμένη» είναι οριστική (τερματική κατάσταση). Θέλετε σίγουρα να συνεχίσετε;');
         if (!confirmed) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
             return;
         }
     }
@@ -534,6 +578,7 @@ async function handleEditOffer(e) {
             UniBiteAuth.showToast(result.message, 'success');
             closeEditModal();
             loadMyOffers();
+            loadCookStats();
         } else {
             UniBiteAuth.showToast(result.error || 'Σφάλμα ενημέρωσης.', 'error');
         }
@@ -563,6 +608,7 @@ async function handleRequest(requestId, action) {
     if (result.success) {
         UniBiteAuth.showToast(result.message, 'success');
         loadMyOffers();
+        loadCookStats();
     } else {
         UniBiteAuth.showToast(result.error || 'Σφάλμα ενημέρωσης.', 'error');
     }
@@ -582,23 +628,8 @@ function translateStatus(status) {
 function escapeHtml(str) {
     if (str === null || str === undefined) return '';
     return String(str).replace(/[&<>\"']/g, function(tag) {
-        const chars = {
-            '&': '&',
-            '<': '<',
-            '>': '>',
-            '"': '"',
-            "'": "'"
-        };
+        const chars = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
         return chars[tag] || tag;
-    });
-}
-
-function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
     });
 }
 
@@ -606,7 +637,6 @@ document.getElementById('edit-modal')?.addEventListener('click', function(e) {
     if (e.target === this) closeEditModal();
 });
 
-// 14 common allergens (EU regulation)
 const ALLERGENS = [
     'Γλούτη (Gluten)', 'Καραβίδες (Crustaceans)', 'Αυγά (Eggs)', 'Ψάρια (Fish)',
     'Αράχιδες (Peanuts)', 'Σογιά (Soybeans)', 'Γάλα (Milk)', 'Ξηροί καρποί (Nuts)',
@@ -614,14 +644,12 @@ const ALLERGENS = [
     'Λουπίνα (Lupin)', 'Μαλάκια (Molluscs)'
 ];
 
-// Populate allergens checkboxes
 function populateAllergens(containerId, selectedAllergens = []) {
     const container = document.getElementById(containerId);
     if (!container) return;
 
     container.innerHTML = ALLERGENS.map(allergen => {
         const isChecked = selectedAllergens.some(a => a.toLowerCase() === allergen.toLowerCase());
-        const id = `allergen-${allergen.replace(/[^a-zA-Z0-9α-ωΑ-Ω]/g, '-')}`;
         return `
             <label style="display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.85rem; cursor: pointer;">
                 <input type="checkbox" name="allergens" value="${allergen}" ${isChecked ? 'checked' : ''} style="width: 16px; height: 16px; accent-color: var(--dp-color-accent);">
@@ -631,7 +659,6 @@ function populateAllergens(containerId, selectedAllergens = []) {
     }).join('');
 }
 
-// Auto-fill coordinates from pickup location dropdown
 function setupPickupLocationAutofill(selectId, coordinatesId) {
     const select = document.getElementById(selectId);
     const coordinatesInput = document.getElementById(coordinatesId);
@@ -641,63 +668,253 @@ function setupPickupLocationAutofill(selectId, coordinatesId) {
         const selectedOption = this.options[this.selectedIndex];
         if (selectedOption && selectedOption.dataset.lat && selectedOption.dataset.lng) {
             coordinatesInput.value = `${selectedOption.dataset.lat}, ${selectedOption.dataset.lng}`;
-        } else {
-            coordinatesInput.value = '';
         }
     });
 }
 
-// Parse existing pickup_location ID and populate edit modal dropdown
-function parsePickupLocationForEdit(location) {
-    const editSelect = document.getElementById('edit-pickup_location');
-    if (!editSelect || !location) return;
+// Setup custom location field visibility (dorm_custom / home_custom)
+function setupCustomLocationFields(selectId, dormFieldId, homeFieldsId, homeNotesFieldId, hintId) {
+    const select = document.getElementById(selectId);
+    const dormField = document.getElementById(dormFieldId);
+    const homeFields = document.getElementById(homeFieldsId);
+    const homeNotesField = document.getElementById(homeNotesFieldId);
+    const hint = document.getElementById(hintId);
+    if (!select) return;
 
-    // Try to match by value (location ID)
-    for (let option of editSelect.options) {
-        if (option.value === location) {
-            editSelect.value = location;
-            // Trigger change to update coordinates
-            editSelect.dispatchEvent(new Event('change'));
-            return;
+    function updateFields() {
+        const value = select.value;
+        const isDormCustom = value === 'dorm_custom';
+        const isHomeCustom = value === 'home_custom';
+
+        if (dormField) dormField.style.display = isDormCustom ? 'block' : 'none';
+        if (homeFields) homeFields.style.display = isHomeCustom ? 'block' : 'none';
+        if (homeNotesField) homeNotesField.style.display = isHomeCustom ? 'block' : 'none';
+
+        const dormBuildingInput = dormField ? dormField.querySelector('input[name="dorm_building"]') : null;
+        const dormNumberInput = dormField ? dormField.querySelector('input[name="dorm_number"]') : null;
+        const homeStreetInput = homeFields ? homeFields.querySelector('input[name="home_street"]') : null;
+        const homeNumberInput = homeFields ? homeFields.querySelector('input[name="home_number"]') : null;
+
+        if (dormBuildingInput) dormBuildingInput.required = isDormCustom;
+        if (dormNumberInput) dormNumberInput.required = isDormCustom;
+        if (homeStreetInput) homeStreetInput.required = isHomeCustom;
+        if (homeNumberInput) homeNumberInput.required = isHomeCustom;
+
+        if (hint) {
+            if (isDormCustom) {
+                hint.textContent = 'Συμπληρώστε το κτίριο/πτέρυγα και τον αριθμό δωματίου της εστίας';
+            } else if (isHomeCustom) {
+                hint.textContent = 'Κάντε κλικ στον χάρτη ή σύρετε την πινέζα στο σπίτι σας και ελέγξτε τον αριθμό';
+            } else {
+                hint.textContent = 'Επιλέξτε ένα από τα επίσημα σημεία παράδοσης του Πανεπιστημίου Πατρών';
+            }
+        }
+
+        if (isHomeCustom) {
+            if (homeFieldsId === 'home-custom-fields') {
+                setTimeout(() => initHomeMap('home-map', 'home-street', 'home-number', 'coordinates'), 120);
+            } else if (homeFieldsId === 'edit-home-custom-fields') {
+                setTimeout(() => initHomeMap('edit-home-map', 'edit-home-street', 'edit-home-number', 'edit-coordinates'), 120);
+            }
         }
     }
 
-    // Fallback: try to match by text content (legacy format)
-    const legacyMap = {
-        'Φοιτητική Εστία Α': 'fep-building-a',
-        'Φοιτητική Εστία Β': 'fep-building-b',
-        'Φοιτητική Εστία Γ': 'fep-building-c',
-        'Φοιτητική Εστία Ζ': 'fep-building-z',
-        'Φοιτητική Εστία Η': 'fep-building-h',
-        'Φοιτητική Εστία Θ': 'fep-building-th',
-        'Κτίριο Α - Διοίκηση': 'admin-building-a',
-        'Κτίριο Β': 'building-b',
-        'CEID': 'ceid-building',
-        'ECE': 'ece-building',
-        'Μηχανολόγοι': 'mech-aero-building',
-        'Πολιτικοί Μηχανικοί': 'civil-eng-building',
-        'Χημικοί Μηχανικοί': 'chem-eng-building',
-        'Ιατρική': 'med-preclinical-building',
-        'Φυσική': 'physics-math-building',
-        'Χημεία': 'chemistry-building-north',
-        'Βιολογία': 'biology-building',
-        'Γεωλογία': 'geology-building',
-        'Εκπαίδευση': 'education-social-work-building',
-        'Βιβλιοθήκη': 'central-library',
-        'Συνεδριακό': 'conference-center',
-        'Πάρκο Ειρήνης': 'peace-park',
-        'Φοιτητική Λέσχη': 'fep-canteen',
-        'Κουκούλι': 'koukouli-dormitory'
-    };
+    select.addEventListener('change', updateFields);
+    updateFields();
+}
 
-    for (const [key, value] of Object.entries(legacyMap)) {
-        if (location.includes(key)) {
-            editSelect.value = value;
+// Initialize Leaflet map for home pin picker
+function initHomeMap(mapContainerId, streetInputId, numberInputId, coordinatesInputId) {
+    if (typeof L === 'undefined') {
+        console.warn('Leaflet not loaded');
+        return;
+    }
+
+    const mapContainer = document.getElementById(mapContainerId);
+    const streetInput = document.getElementById(streetInputId);
+    const numberInput = document.getElementById(numberInputId);
+    const coordinatesInput = document.getElementById(coordinatesInputId);
+
+    if (!mapContainer) return;
+
+    // If already initialized, just resize it properly
+    if (mapContainerId === 'home-map' && homeMapInstance) {
+        setTimeout(() => homeMapInstance.invalidateSize(), 100);
+        return;
+    }
+    if (mapContainerId === 'edit-home-map' && editHomeMapInstance) {
+        setTimeout(() => editHomeMapInstance.invalidateSize(), 100);
+        return;
+    }
+
+    const PATRAS_CENTER = [38.2466, 21.7346];
+
+    const map = L.map(mapContainerId, {
+        center: PATRAS_CENTER,
+        zoom: 14,
+        zoomControl: true,
+        scrollWheelZoom: true
+    });
+
+    L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        attribution: '&copy; Google Maps'
+    }).addTo(map);
+
+    const marker = L.marker(PATRAS_CENTER, {
+        draggable: true,
+        title: 'Σύρετε την πινέζα στο σπίτι σας'
+    }).addTo(map);
+
+    function reverseGeocode(lat, lng) {
+        if (coordinatesInput) {
+            coordinatesInput.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        }
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=el`)
+            .then(response => response.json())
+            .then(data => {
+                if (data && data.address) {
+                    const address = data.address;
+                    const road = address.road || address.pedestrian || address.footway || address.neighbourhood || '';
+                    const houseNumber = address.house_number || '';
+                    const suburb = address.suburb || address.city_district || '';
+                    const city = address.city || address.town || address.municipality || 'Πάτρα';
+
+                    let streetValue = road;
+                    if (suburb && suburb !== city && suburb !== road) {
+                        streetValue += (streetValue ? ', ' : '') + suburb;
+                    }
+                    if (city && !streetValue.includes(city)) {
+                        streetValue += (streetValue ? ', ' : '') + city;
+                    }
+
+                    if (streetInput && streetValue) {
+                        streetInput.value = streetValue;
+                    }
+                    if (numberInput && houseNumber) {
+                        numberInput.value = houseNumber;
+                    } else if (numberInput && !numberInput.value) {
+                        numberInput.focus();
+                    }
+                }
+            })
+            .catch(err => console.warn('Reverse geocoding failed:', err));
+    }
+
+    marker.on('dragend', function() {
+        const pos = marker.getLatLng();
+        reverseGeocode(pos.lat, pos.lng);
+    });
+
+    map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        reverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
+
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 150);
+
+    if (mapContainerId === 'home-map') {
+        homeMapInstance = map;
+        homeMarkerInstance = marker;
+    } else if (mapContainerId === 'edit-home-map') {
+        editHomeMapInstance = map;
+        editHomeMarkerInstance = marker;
+    }
+}
+
+function parsePickupLocationForEdit(location, lat, lng) {
+    const editSelect = document.getElementById('edit-pickup_location');
+    if (!editSelect || !location) return;
+
+    if (location.startsWith('dorm_custom:')) {
+        editSelect.value = 'dorm_custom';
+        editSelect.dispatchEvent(new Event('change'));
+
+        const dormRoom = location.replace('dorm_custom:', '').trim();
+        // Parse "Κτίριο Α, Δωμάτιο 112" format
+        const parts = dormRoom.split(',').map(p => p.trim());
+        let building = '';
+        let number = '';
+        for (const part of parts) {
+            if (part.startsWith('Δωμάτιο')) {
+                number = part.replace('Δωμάτιο', '').trim();
+            } else {
+                building = part;
+            }
+        }
+        const dormBuildingInput = document.getElementById('edit-dorm-building');
+        const dormNumberInput = document.getElementById('edit-dorm-number');
+        if (dormBuildingInput) dormBuildingInput.value = building;
+        if (dormNumberInput) dormNumberInput.value = number;
+        return;
+    }
+
+    if (location.startsWith('home_custom:')) {
+        editSelect.value = 'home_custom';
+        editSelect.dispatchEvent(new Event('change'));
+
+        const raw = location.replace('home_custom:', '').trim();
+        const parts = raw.split(',').map(p => p.trim());
+        const homeStreetInput = document.getElementById('edit-home-street');
+        const homeNumberInput = document.getElementById('edit-home-number');
+        const homeFloorInput = document.getElementById('edit-home-floor');
+        const homeBellInput = document.getElementById('edit-home-bell');
+
+        if (parts.length > 0) {
+            const firstPart = parts[0];
+            const match = firstPart.match(/^(.+?)\s+(\d+[a-zA-ZΑ-Ωα-ω]?)$/);
+            if (match) {
+                if (homeStreetInput) homeStreetInput.value = match[1] + (parts[1] ? ', ' + parts[1] : '');
+                if (homeNumberInput) homeNumberInput.value = match[2];
+                // Parse remaining parts for floor and bell
+                let floor = '';
+                let bell = '';
+                for (let i = 1; i < parts.length; i++) {
+                    if (parts[i].startsWith('Όροφος:')) {
+                        floor = parts[i].replace('Όροφος:', '').trim();
+                    } else if (parts[i].startsWith('Κουδούνι:')) {
+                        bell = parts[i].replace('Κουδούνι:', '').trim();
+                    }
+                }
+                if (homeFloorInput) homeFloorInput.value = floor;
+                if (homeBellInput) homeBellInput.value = bell;
+            } else {
+                if (homeStreetInput) homeStreetInput.value = firstPart;
+                if (homeNumberInput && parts[1]) homeNumberInput.value = parts[1];
+                // Parse remaining parts for floor and bell
+                let floor = '';
+                let bell = '';
+                for (let i = 2; i < parts.length; i++) {
+                    if (parts[i].startsWith('Όροφος:')) {
+                        floor = parts[i].replace('Όροφος:', '').trim();
+                    } else if (parts[i].startsWith('Κουδούνι:')) {
+                        bell = parts[i].replace('Κουδούνι:', '').trim();
+                    }
+                }
+                if (homeFloorInput) homeFloorInput.value = floor;
+                if (homeBellInput) homeBellInput.value = bell;
+            }
+        }
+
+        if (lat && lng) {
+            setTimeout(() => {
+                if (editHomeMapInstance && editHomeMarkerInstance) {
+                    const pos = [parseFloat(lat), parseFloat(lng)];
+                    editHomeMarkerInstance.setLatLng(pos);
+                    editHomeMapInstance.setView(pos, 16);
+                }
+            }, 250);
+        }
+        return;
+    }
+
+    for (let option of editSelect.options) {
+        if (option.value === location) {
+            editSelect.value = location;
             editSelect.dispatchEvent(new Event('change'));
             return;
         }
     }
 }
-
-// Initialize on page load
-// (DOMContentLoaded listener is at the top of the file)

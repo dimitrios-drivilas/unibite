@@ -36,6 +36,17 @@ $status = $_POST['status'] ?? 'active';
 $latitude = floatval($_POST['latitude'] ?? 38.2942);
 $longitude = floatval($_POST['longitude'] ?? 21.7887);
 
+// Handle custom location formats
+if (str_starts_with($pickup_location, 'dorm_custom:')) {
+    // Format: dorm_custom: ΦΕΠ Κτίριο Α, Δωμάτιο 112
+    $customDetails = trim(substr($pickup_location, strlen('dorm_custom:')));
+    $pickup_location = "🏢 Εστίες: {$customDetails}";
+} elseif (str_starts_with($pickup_location, 'home_custom:')) {
+    // Format: home_custom: Οδός, Αριθμός
+    $customDetails = trim(substr($pickup_location, strlen('home_custom:')));
+    $pickup_location = "🏠 Σπίτι: {$customDetails}";
+}
+
 // Terminal statuses that cannot be edited
 $terminalStatuses = ['completed', 'cancelled', 'expired'];
 

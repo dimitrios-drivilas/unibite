@@ -18,7 +18,7 @@ $user = authGuard(['admin']);
 <body>
     <header class="navbar">
         <div class="navbar-brand">
-            <a href="Admin/admin.php" class="navbar-brand">
+            <a href="../index.php" class="navbar-brand">
                 <span class="logo-uni">Uni</span><span class="logo-bite">Bite</span>
             </a>
             <span class="navbar-badge">CAMPUS FOOD</span>
@@ -53,10 +53,10 @@ $user = authGuard(['admin']);
             </div>
         </div>
 
-        <div class="leaderboard-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--dp-spacing-grid-gap); margin-top: var(--dp-spacing-xl);">
+        <div class="leaderboard-container">
             <div class="card">
                 <h3>🏆 Top Donors (Μερίδες)</h3>
-                <div class="table-wrap">
+                <div class="table-wrap" style="overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;">
                     <table class="table">
                         <thead>
                             <tr>
@@ -74,7 +74,7 @@ $user = authGuard(['admin']);
 
             <div class="card">
                 <h3>🍽️ Top Rated Γεύματα</h3>
-                <div class="table-wrap">
+                <div class="table-wrap" style="overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;">
                     <table class="table">
                         <thead>
                             <tr>
@@ -95,7 +95,7 @@ $user = authGuard(['admin']);
         <section style="margin-top: var(--dp-spacing-2xl);">
             <h3>👥 Διαχείριση Χρηστών</h3>
             <div class="card">
-                <div class="table-wrap">
+                <div class="table-wrap" style="overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;">
                     <table class="table">
                         <thead>
                             <tr>
@@ -119,7 +119,7 @@ $user = authGuard(['admin']);
         <section style="margin-top: var(--dp-spacing-xl);">
             <h3>🍽️ Όλες οι Αγγελίες (Moderation)</h3>
             <div class="card">
-                <div class="table-wrap">
+                <div class="table-wrap" style="overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%;">
                     <table class="table">
                         <thead>
                             <tr>

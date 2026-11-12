@@ -175,13 +175,13 @@ if ($isLoggedIn) {
                 </div>
 
                 <!-- Stats Grid + Action Cards -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--dp-spacing-xl);">
+                <div class="dashboard-layout" style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--dp-spacing-xl);">
                     <!-- Stats Card -->
                     <div class="card" style="padding: var(--dp-spacing-lg);">
                         <h3 style="margin: 0 0 var(--dp-spacing-lg); font-size: 1.1rem; color: var(--dp-color-ink); font-weight: 700; display:flex; align-items:center; gap:var(--dp-spacing-sm);">
                             <span style="font-size:1.25rem;">📊</span> Συνολικά Στατιστικά
                         </h3>
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--dp-spacing-md);">
+                        <div class="dashboard-stats-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--dp-spacing-md);">
                             <?php if ($hasCook): ?>
                             <div class="stat-item" style="background:var(--dp-color-ground-muted); border-radius:var(--dp-radius-panel); padding:var(--dp-spacing-md); border:var(--dp-border-hairline) solid var(--dp-color-rule);">
                                 <div style="font-family: var(--dp-font-display); font-size: 1.75rem; font-weight: 700; color: var(--dp-color-accent);" id="stat-offers"><?= $cook_offers_count ?></div>
@@ -211,7 +211,7 @@ if ($isLoggedIn) {
                     </div>
 
                     <!-- Action Cards -->
-                    <div style="display: flex; flex-direction: column; gap: var(--dp-spacing-md);">
+                    <div class="dashboard-actions-grid" style="display: flex; flex-direction: column; gap: var(--dp-spacing-md);">
                         <?php if ($hasCook): ?>
                         <a href="Cook/cook.php" class="action-card" style="display:flex; align-items:center; gap:var(--dp-spacing-lg); padding:var(--dp-spacing-lg); background:var(--dp-color-panel); border:var(--dp-border-hairline) solid var(--dp-color-rule); border-radius:var(--dp-radius-panel); text-decoration:none; color:inherit; transition:box-shadow var(--dp-motion-interaction) var(--dp-motion-easing), transform var(--dp-motion-interaction) var(--dp-motion-easing), border-color var(--dp-motion-interaction) var(--dp-motion-easing);">
                             <div style="flex-shrink:0; width:64px; height:64px; border-radius:var(--dp-radius-panel); background:linear-gradient(135deg,var(--dp-color-accent),var(--dp-color-accent-hover)); display:flex; align-items:center; justify-content:center; font-size:1.75rem;">🍳</div>
@@ -374,7 +374,7 @@ if ($isLoggedIn) {
 
         <?php else: ?>
             <!-- NOT LOGGED IN: LANDING PAGE -->
-            <section class="hero-split" role="main" aria-labelledby="hero-title">
+            <section class="hero-split home-layout" role="main" aria-labelledby="hero-title">
                 <!-- LEFT COLUMN -->
                 <section class="hero-left" aria-labelledby="hero-title">
                     <h1 id="hero-title" class="hero-title">Μοιράσου το φαγητό σου, στήριξε τους συμφοιτητές σου</h1>

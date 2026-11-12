@@ -45,8 +45,9 @@ $user = authGuard(['consumer']);
             <div class="filter-grid">
                 <div class="filter-group">
                     <label class="form-label">Η θέση μου (για απόσταση)</label>
-                    <div style="display: flex; gap: var(--dp-spacing-sm);">
-                        <input type="text" id="user-location" class="form-control" placeholder="π.χ. Φοιτητική Εστία Α" style="flex: 1;">
+                    <div style="display: flex; gap: var(--dp-spacing-sm); position: relative;">
+                        <input type="text" id="user-location" class="form-control" placeholder="π.χ. Φοιτητική Εστία Α" style="flex: 1;" autocomplete="off">
+                        <div id="user-location-suggestions" class="autocomplete-dropdown" style="display: none;"></div>
                         <button type="button" class="btn btn-secondary" onclick="geocodeUserLocation()" style="white-space: nowrap;">Εύρεση</button>
                     </div>
                     <small class="form-hint">Αφήστε κενό για να δείτε όλα χωρίς φίλτρο απόστασης</small>
@@ -54,6 +55,15 @@ $user = authGuard(['consumer']);
                 <div class="filter-group">
                     <label class="form-label">Μέγιστη Απόσταση (km)</label>
                     <input type="number" id="max-distance" class="form-control" min="1" max="50" value="10" step="1">
+                </div>
+                <div class="filter-group">
+                    <label class="form-label">Τύπος Τοποθεσίας</label>
+                    <select id="location-type" class="form-control">
+                        <option value="">Όλοι οι τύποι</option>
+                        <option value="campus">🏛️ Campus (Κτίρια Πανεπιστημίου)</option>
+                        <option value="dorm">🏢 Φοιτητικές Εστίες</option>
+                        <option value="home">🏠 Στο Σπίτι Μάγειρα</option>
+                    </select>
                 </div>
                 <div class="filter-group">
                     <label class="form-label">Ταξινόμηση</label>

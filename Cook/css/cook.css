@@ -144,6 +144,14 @@
                 border-color var(--dp-motion-interaction) var(--dp-motion-easing);
 }
 
+/* Prevent horizontal overflow in grid children */
+.offer-card > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+}
+
 .offer-card:hover {
     box-shadow: var(--dp-shadow-hover);
     border-color: #cbd5e1;
@@ -214,6 +222,10 @@
     color: var(--dp-color-ink);
     line-height: 1.5;
     font-size: var(--dp-typography-small);
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
 }
 
 /* Allergens line */
@@ -221,6 +233,10 @@
     font-size: var(--dp-typography-metadata);
     color: var(--dp-color-ink-secondary);
     margin: 0;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
 }
 
 /* Metadata chips - horizontal row */
@@ -240,6 +256,10 @@
     padding: 4px 10px;
     font-weight: 500;
     white-space: nowrap;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
 }
 
 .offer-meta strong {
@@ -276,14 +296,22 @@
 .requests-list {
     flex: 1;
     overflow-y: auto;
+    overflow-x: hidden;
     max-height: 320px;
     padding-right: 4px;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .requests-grid {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 .request-item {
@@ -294,6 +322,10 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 .request-item-header {
@@ -302,12 +334,20 @@
     align-items: center;
     gap: var(--dp-spacing-sm);
     flex-wrap: wrap;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 .request-item .consumer-name {
     font-size: var(--dp-typography-small);
     font-weight: 600;
     color: var(--dp-color-ink);
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
 }
 
 .request-item .request-status {
@@ -316,7 +356,10 @@
     padding: 2px 8px;
     background: var(--dp-color-panel);
     border-radius: var(--dp-radius-pill);
-    white-space: nowrap;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    max-width: 100% !important;
 }
 
 .request-item .request-actions {
@@ -340,6 +383,10 @@
     padding-top: 6px;
     border-top: var(--dp-border-hairline) solid var(--dp-color-rule);
     margin-top: 6px;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: hidden;
+    box-sizing: border-box;
 }
 
 .request-rating .rating-stars {
@@ -357,6 +404,10 @@
     font-size: var(--dp-typography-metadata);
     color: var(--dp-color-ink-secondary);
     font-weight: 500;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
 }
 
 .request-rating .rating-comment {
@@ -365,6 +416,10 @@
     font-size: var(--dp-typography-metadata);
     flex-basis: 100%;
     margin-top: 2px;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    white-space: normal !important;
+    max-width: 100% !important;
 }
 
 .request-rating .rating-pending,
@@ -594,5 +649,126 @@
     .offer-header .offer-actions {
         width: 100%;
         justify-content: flex-end;
+    }
+}
+
+/* ==========================================================================
+   Responsive Styles for Cook Page
+   ========================================================================== */
+
+/* --- Cook Grid (Tab: Αγγελίες μου) --- */
+.cook-grid {
+    display: grid;
+    grid-template-columns: 350px 1fr;
+    gap: 28px;
+    align-items: start;
+}
+
+/* Tablet & Mobile: Single column */
+@media (max-width: 960px) {
+    .cook-grid {
+        grid-template-columns: 1fr !important;
+        gap: 20px;
+    }
+}
+
+/* --- Address Grid (Street + Number) --- */
+.address-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 10px;
+    margin-bottom: var(--dp-spacing-sm);
+}
+
+/* --- Floor & Bell Grid --- */
+.floor-bell-grid {
+    display: grid;
+    grid-template-columns: 1fr 1.5fr;
+    gap: 10px;
+    margin-bottom: var(--dp-spacing-sm);
+}
+
+/* Mobile: Stack address and floor/bell grids */
+@media (max-width: 480px) {
+    .address-grid,
+    .floor-bell-grid {
+        grid-template-columns: 1fr !important;
+        gap: var(--dp-spacing-sm);
+    }
+}
+
+/* Mobile: Offer cards vertical stack */
+@media (max-width: 768px) {
+    .offer-card {
+        grid-template-columns: 1fr !important;
+        aspect-ratio: auto !important;
+        max-height: none !important;
+        min-width: 0 !important;
+    }
+    .offer-right {
+        border-left: none;
+        border-top: 1px solid var(--dp-color-rule);
+        padding-left: 0;
+        padding-top: 12px;
+    }
+    .offer-header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    .offer-header .offer-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
+
+/* Tablet: Offer cards maintain horizontal but smaller */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .offer-card {
+        min-width: 0;
+        max-height: 500px;
+    }
+    .offer-left > img:first-child {
+        height: 100px;
+    }
+}
+
+/* Stats grid responsive */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+
+/* Tabs responsive */
+@media (max-width: 768px) {
+    .tabs {
+        display: flex;
+        flex-wrap: wrap;
+    }
+    .tab-btn {
+        flex: 1;
+        text-align: center;
+        white-space: nowrap;
+        font-size: 0.9rem;
+        padding: 10px 12px;
+        min-width: 0;
+    }
+}
+
+/* Modal responsive */
+@media (max-width: 640px) {
+    .modal {
+        width: calc(100vw - 24px) !important;
+        max-width: 100% !important;
+        margin: 12px !important;
+        padding: 16px !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
     }
 }

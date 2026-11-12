@@ -16,6 +16,7 @@ $lon = isset($_GET['lon']) && $_GET['lon'] !== '' ? floatval($_GET['lon']) : nul
 $maxDistance = isset($_GET['max_distance']) ? floatval($_GET['max_distance']) : 10; // km
 $sortBy = $_GET['sort'] ?? 'created_desc'; // created_desc, distance_asc, portions_desc
 $limit = isset($_GET['limit']) ? max(1, min(200, intval($_GET['limit']))) : 50;
+$locationType = isset($_GET['location_type']) ? $_GET['location_type'] : ''; // campus, dorm, home
 
 // Base query: get active or inactive (0 portions) offers that have not expired and are not cancelled/expired
 $whereConditions = [
@@ -23,6 +24,15 @@ $whereConditions = [
     "o.status IN ('active', 'inactive')"
 ];
 $params = [];
+
+// Filter by location type
+if ($locationType === 'dorm') {
+    $whereConditions[] = "o.pickup_location LIKE '🏢 Εστίες:%'";
+} elseif ($locationType === 'home') {
+    $whereConditions[] = "o.pickup_location LIKE '🏠 Σπίτι:%'";
+} elseif ($locationType === 'campus') {
+    $whereConditions[] = "o.pickup_location NOT LIKE '🏢 Εστίες:%' AND o.pickup_location NOT LIKE '🏠 Σπίτι:%'";
+}
 
 $haversineExpr = "(6371 * ACOS(LEAST(1.0, GREATEST(-1.0, COS(RADIANS(?)) * COS(RADIANS(o.latitude)) * COS(RADIANS(o.longitude) - RADIANS(?)) + SIN(RADIANS(?)) * SIN(RADIANS(o.latitude))))))";
 
